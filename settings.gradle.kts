@@ -123,6 +123,7 @@ includeProject(":app:android", "app/android") // Android client
 includeProject(":app:ios", "app/ios") // iOS Launcher
 
 includeProject(":client")
+includeProject(":syncplay")
 
 // server
 //includeProject(":server:core", "server/core") // server core
