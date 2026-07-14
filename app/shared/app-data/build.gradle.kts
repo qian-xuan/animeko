@@ -72,6 +72,8 @@ kotlin {
         api(projects.danmaku.danmakuApi)
         api(projects.danmaku.dandanplay)
 
+        implementation(projects.syncplay)
+
         api(libs.paging.common)
 
         implementation(libs.koin.core)

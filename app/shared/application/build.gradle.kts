@@ -34,6 +34,7 @@ kotlin {
         api(projects.app.shared)
         api(libs.kotlinx.coroutines.core)
         implementation(libs.atomicfu)
+        implementation(projects.syncplay)
     }
     sourceSets.commonTest.dependencies {
         implementation(projects.utils.uiTesting)
