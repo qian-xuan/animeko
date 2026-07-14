@@ -24,7 +24,6 @@
 @file:DependsOn("org.jetbrains:annotations:23.0.0")
 @file:DependsOn("actions:github-script:v7")
 @file:DependsOn("gradle:actions__setup-gradle:v3")
-@file:DependsOn("timheuer:base64-to-file:v1.1")
 @file:DependsOn("actions:upload-artifact:v4")
 @file:DependsOn("actions:download-artifact:v4")
 @file:DependsOn("reactivecircus:android-emulator-runner:v2.35.0")
@@ -72,7 +71,6 @@ import io.github.typesafegithub.workflows.actions.jlumbroso.FreeDiskSpace_Untype
 import io.github.typesafegithub.workflows.actions.reactivecircus.AndroidEmulatorRunner
 import io.github.typesafegithub.workflows.actions.snowactions.Qrcode_Untyped
 import io.github.typesafegithub.workflows.actions.softprops.ActionGhRelease
-import io.github.typesafegithub.workflows.actions.timheuer.Base64ToFile_Untyped
 import io.github.typesafegithub.workflows.domain.AbstractResult
 import io.github.typesafegithub.workflows.domain.ActionStep
 import io.github.typesafegithub.workflows.domain.CommandStep
@@ -1412,17 +1410,14 @@ class WithMatrix(
     /**
      * Returns the action step if it's enabled, otherwise returns `null`.
      */
-    fun JobBuilder<*>.prepareSigningKey(): ActionStep<Base64ToFile_Untyped.Outputs>? {
+    fun JobBuilder<*>.prepareSigningKey(): CommandStep? {
         return if (matrix.uploadApk) {
-            uses(
+            prepareBase64File(
                 name = "Prepare signing key",
                 `if` = expr { github.isAnimekoRepository and !github.isPullRequest },
-                action = Base64ToFile_Untyped(
-                    fileName_Untyped = "android_signing_key",
-                    fileDir_Untyped = "./",
-                    encodedString_Untyped = expr { secrets.SIGNING_RELEASE_STOREFILE },
-                ),
-                continueOnError = true,
+                fileName = "android_signing_key",
+                fileDir = ".",
+                encodedString = expr { secrets.SIGNING_RELEASE_STOREFILE },
             )
         } else {
             null
@@ -1432,16 +1427,51 @@ class WithMatrix(
     /**
      * Returns the action step if it's enabled, otherwise returns `null`.
      */
-    fun JobBuilder<*>.prepareGoogleServicesJson(): ActionStep<Base64ToFile_Untyped.Outputs>? {
-        return uses(
+    fun JobBuilder<*>.prepareGoogleServicesJson(): CommandStep {
+        return prepareBase64File(
             name = "Prepare google-services.json",
             `if` = expr { github.isAnimekoRepository and !github.isPullRequest },
-            action = Base64ToFile_Untyped(
-                fileName_Untyped = "google-services.json",
-                fileDir_Untyped = "./app/android",
-                encodedString_Untyped = expr { secrets.GOOGLE_SERVICES_JSON },
-            ),
+            fileName = "google-services.json",
+            fileDir = "./app/android",
+            encodedString = expr { secrets.GOOGLE_SERVICES_JSON },
+        )
+    }
+
+    fun JobBuilder<*>.prepareBase64File(
+        name: String,
+        @SuppressWarnings("FunctionParameterNaming")
+        `if`: String,
+        fileName: String,
+        fileDir: String,
+        encodedString: String,
+    ): CommandStep {
+        val filePath = "$fileDir/$fileName"
+        return run(
+            name = name,
+            `if` = `if`,
             continueOnError = true,
+            shell = Shell.Bash,
+            env = mapOf(
+                "BASE64_CONTENT" to encodedString,
+                "FILE_PATH" to filePath,
+            ),
+            command = shell(
+                $$"""
+                set -euo pipefail
+
+                if [ -z "${BASE64_CONTENT:-}" ]; then
+                  echo "BASE64_CONTENT is empty" >&2
+                  exit 1
+                fi
+
+                mkdir -p "$(dirname "$FILE_PATH")"
+                if ! printf '%s' "$BASE64_CONTENT" | base64 --decode > "$FILE_PATH" 2>/dev/null; then
+                  printf '%s' "$BASE64_CONTENT" | base64 -D > "$FILE_PATH"
+                fi
+                chmod 600 "$FILE_PATH"
+                echo "filePath=$FILE_PATH" >> "$GITHUB_OUTPUT"
+                """.trimIndent(),
+            ),
         )
     }
 
@@ -1486,7 +1516,7 @@ class WithMatrix(
         }
     }
 
-    fun JobBuilder<*>.buildAndroidApk(prepareSigningKey: ActionStep<Base64ToFile_Untyped.Outputs>) {
+    fun JobBuilder<*>.buildAndroidApk(prepareSigningKey: CommandStep) {
         if (matrix.uploadApk) {
             runGradle(
                 name = "Build Android Debug APKs",
@@ -1518,7 +1548,7 @@ class WithMatrix(
                 `if` = expr { github.isAnimekoRepository and !github.isPullRequest },
                 tasks = arrayOf("assembleDefaultRelease"),
                 env = mapOf(
-                    "signing_release_storeFileFromRoot" to expr { prepareSigningKey.outputs.filePath },
+                    "signing_release_storeFileFromRoot" to expr { prepareSigningKey.outputs["filePath"] },
                     "signing_release_storePassword" to expr { secrets.SIGNING_RELEASE_STOREPASSWORD },
                     "signing_release_keyAlias" to expr { secrets.SIGNING_RELEASE_KEYALIAS },
                     "signing_release_keyPassword" to expr { secrets.SIGNING_RELEASE_KEYPASSWORD },
@@ -1765,10 +1795,18 @@ class WithMatrix(
                         # Download appimagetool
                         wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
                         chmod +x appimagetool-x86_64.AppImage
+
+                        # Bundle the external updater. It is copied out of the read-only AppImage mount before use.
+                        appImageUpdateVersion="2.0.0-alpha-1-20251018"
+                        appImageUpdateTool="appimageupdatetool-x86_64.AppImage"
+                        wget "https://github.com/AppImageCommunity/AppImageUpdate/releases/download/$appImageUpdateVersion/$appImageUpdateTool"
+                        echo "d976cdac667b03dee8cb23fb95ef74b042c406c5cbab3ff294d2b16efeaff84f  $appImageUpdateTool" | sha256sum -c -
+                        chmod +x "$appImageUpdateTool"
                         
                         # Prepare AppDir
                         mkdir -p AppDir/usr
                         cp -r app/desktop/build/compose/binaries/main-release/app/Ani/* AppDir/usr
+                        cp "$appImageUpdateTool" AppDir/usr/lib/app/resources/
                         
                         cp app/desktop/appResources/linux-x64/AppRun AppDir/AppRun
                         cp app/desktop/appResources/linux-x64/animeko.desktop AppDir/animeko.desktop
@@ -1779,18 +1817,36 @@ class WithMatrix(
                         chmod a+x AppDir/usr/bin/Ani
                         chmod a+x AppDir/usr/lib/runtime/lib/jcef_helper
                         
-                        # Build AppImage
-                        ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir
+                        # Build an AppImage whose zsync metadata points at this repository's release asset.
+                        # Build with the final release filename so the generated zsync metadata keeps that name,
+                        # then normalize the local filenames expected by the upload tasks below.
+                        releaseTag="$GITHUB_REF_NAME"
+                        releaseVersion="$(printf '%s' "$releaseTag" | sed 's/^v//')"
+                        # Pull request merge refs contain '/', which must not become a path separator here.
+                        releaseVersion="${releaseVersion//\//-}"
+                        releaseAsset="ani-$releaseVersion-linux-x86_64.appimage"
+                        updateInformation="zsync|https://github.com/$GITHUB_REPOSITORY/releases/download/$releaseTag/$releaseAsset.zsync"
+                        ARCH=x86_64 ./appimagetool-x86_64.AppImage \
+                          -u "$updateInformation" \
+                          AppDir \
+                          "$releaseAsset"
+                        # Keep the zsync reusable on GitHub, d.myani.org and compatible mirrors.
+                        sed -i "s|^URL:.*|URL: $releaseAsset|" "$releaseAsset.zsync"
+                        mv "$releaseAsset" Animeko-x86_64.AppImage
+                        mv "$releaseAsset.zsync" Animeko-x86_64.AppImage.zsync
                         """.trimIndent(),
                 )
-                // Expected output path: Animeko-x86_64.AppImage.
+                // Expected output paths: Animeko-x86_64.AppImage and Animeko-x86_64.AppImage.zsync.
                 // If changed, change also uploadDesktopDistributions in :ci-helper
 
                 usesWithAttempts(
                     name = "Upload Linux packages",
                     action = UploadArtifact(
                         name = ArtifactNames.linuxAppImage(matrix.arch),
-                        path_Untyped = "Animeko-x86_64.AppImage",
+                        path_Untyped = $$"""
+                            Animeko-x86_64.AppImage
+                            Animeko-x86_64.AppImage.zsync
+                            """.trimIndent(),
                         overwrite = true,
                         ifNoFilesFound = UploadArtifact.BehaviorIfNoFilesFound.Error,
                     ),

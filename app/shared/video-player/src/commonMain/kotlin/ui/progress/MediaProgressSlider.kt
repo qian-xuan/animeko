@@ -11,16 +11,22 @@ package me.him188.ani.app.videoplayer.ui.progress
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Slider
@@ -28,6 +34,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -38,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -46,12 +54,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -61,10 +73,12 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import me.him188.ani.app.domain.media.player.ChunkState
 import me.him188.ani.app.domain.media.player.MediaCacheProgressInfo
+import me.him188.ani.app.ui.foundation.ProvideCompositionLocalsForPreview
 import me.him188.ani.app.ui.foundation.dialogs.PlatformPopupProperties
 import me.him188.ani.app.ui.foundation.effects.onPointerEventMultiplatform
 import me.him188.ani.app.ui.foundation.theme.slightlyWeaken
@@ -76,6 +90,8 @@ import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 const val TAG_PROGRESS_SLIDER_PREVIEW_POPUP = "ProgressSliderPreviewPopup"
+const val TAG_PROGRESS_SLIDER_PREVIEW_FRAME = "ProgressSliderPreviewFrame"
+const val TAG_PROGRESS_SLIDER_CENTERED_PREVIEW_FRAME = "ProgressSliderCenteredPreviewFrame"
 const val TAG_PROGRESS_SLIDER = "ProgressSlider"
 
 /**
@@ -246,6 +262,8 @@ fun MediaProgressSlider(
     colors: MediaProgressSliderColors = MediaProgressSliderDefaults.colors(),
     enabled: Boolean = true,
     showPreviewTimeTextOnThumb: Boolean = true,
+    framePreview: MediaProgressFramePreviewState? = null,
+    showFramePreviewInPopup: Boolean = true,
 //    drawThumb: @Composable DrawScope.() -> Unit = {
 //        drawCircle(
 //            MaterialTheme.colorScheme.primary,
@@ -410,12 +428,59 @@ fun MediaProgressSlider(
                 isHovered || isPressed
             }
         }
+        if (framePreview != null) {
+            // 悬浮或拖动时加载目标位置的预览帧, 显示在浮窗中.
+            val previewingPositionMillis by remember(state) {
+                derivedStateOf {
+                    when {
+                        state.isPreviewing && showPreviewTimeTextOnThumb ->
+                            (state.totalDurationMillis * state.displayPositionRatio).toLong()
+
+                        showPreviewTime -> {
+                            val containerWidth = sliderWidth - thumbWidth
+                            if (containerWidth <= 0) {
+                                null
+                            } else {
+                                val percent = mousePosX.minus(thumbWidth / 2).div(containerWidth)
+                                    .coerceIn(0f, 1f)
+                                (state.totalDurationMillis * percent).toLong()
+                            }
+                        }
+
+                        else -> null
+                    }
+                }
+            }
+            LaunchedEffect(framePreview, state) {
+                snapshotFlow { previewingPositionMillis }
+                    .collectLatest { positionMillis ->
+                        if (positionMillis == null) {
+                            framePreview.onPreviewFinished()
+                            return@collectLatest
+                        }
+                        val total = state.totalDurationMillis
+                        if (total <= 0) return@collectLatest
+                        // BT 源只预览已下载完成的区域, 避免抢占播放位置的下载优先级.
+                        if (!cacheProgressInfoFlow().isPositionCached(positionMillis.toFloat() / total)) {
+                            return@collectLatest
+                        }
+                        framePreview.requestFrame(positionMillis)
+                    }
+            }
+        }
         if (showPreviewTime) {
+            val showFrame = showFramePreviewInPopup && framePreview != null
             ProgressSliderPreviewPopup(
                 offsetX = { mousePosX.roundToInt() },
                 previewTimeBackgroundColor = colors.previewTimeBackgroundColor,
+                shape = previewPopupShape(showFrame),
             ) {
-                PreviewTimeText(previewTimeText, colors.previewTimeTextColor)
+                ProgressSliderPreviewContent(
+                    frame = framePreview?.frame,
+                    text = previewTimeText,
+                    previewTimeTextColor = colors.previewTimeTextColor,
+                    showFrame = showFrame,
+                )
             }
         }
         // draw thumb
@@ -446,11 +511,18 @@ fun MediaProgressSlider(
 
                 // 仅在 detached slider 上显示
                 if (state.isPreviewing && showPreviewTimeTextOnThumb) {
+                    val showFrame = showFramePreviewInPopup && framePreview != null
                     ProgressSliderPreviewPopup(
                         offsetX = { thumbWidth / 2 },
                         previewTimeBackgroundColor = colors.previewTimeBackgroundColor,
+                        shape = previewPopupShape(showFrame),
                     ) {
-                        PreviewTimeText(previewTimeOnThumb, colors.previewTimeTextColor)
+                        ProgressSliderPreviewContent(
+                            frame = framePreview?.frame,
+                            text = previewTimeOnThumb,
+                            previewTimeTextColor = colors.previewTimeTextColor,
+                            showFrame = showFrame,
+                        )
                     }
                 }
             },
@@ -482,10 +554,37 @@ fun MediaProgressSlider(
 }
 
 @Composable
+private fun ProgressSliderPreviewContent(
+    frame: ImageBitmap?,
+    text: String,
+    previewTimeTextColor: Color,
+    showFrame: Boolean,
+) {
+    if (showFrame) {
+        PreviewFrameAndTimeText(
+            frame = frame,
+            text = text,
+            previewTimeTextColor = previewTimeTextColor,
+            showFrameArea = true,
+        )
+    } else {
+        PreviewTimeText(text, previewTimeTextColor)
+    }
+}
+
+/**
+ * 浮窗形状: 只有时间文字时用胶囊形; 有预览帧时用圆角矩形, 避免图片角被大圆角裁掉.
+ */
+@Composable
+internal fun previewPopupShape(hasFrame: Boolean): Shape =
+    if (hasFrame) RoundedCornerShape(12.dp) else CircleShape
+
+@Composable
 fun ProgressSliderPreviewPopup(
     offsetX: () -> Int,
     previewTimeBackgroundColor: Color,
     modifier: Modifier = Modifier,
+    shape: Shape = CircleShape,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -530,7 +629,7 @@ fun ProgressSliderPreviewPopup(
         Box(
             modifier = modifier
                 .testTag(TAG_PROGRESS_SLIDER_PREVIEW_POPUP)
-                .clip(shape = CircleShape)
+                .clip(shape = shape)
                 .background(previewTimeBackgroundColor)
                 .animateContentSize(),
         ) {
@@ -544,23 +643,144 @@ fun ProgressSliderPreviewPopup(
     }
 }
 
+@Preview
+@Composable
+private fun PreviewProgressSliderPreviewPopup() = ProvideCompositionLocalsForPreview {
+    val colors = MediaProgressSliderDefaults.colors()
+    val offsetX = with(LocalDensity.current) { 120.dp.roundToPx() }
+    Box(
+        Modifier
+            .size(width = 240.dp, height = 80.dp)
+            .background(Color.Black),
+    ) {
+        ProgressSliderPreviewPopup(
+            offsetX = { offsetX },
+            previewTimeBackgroundColor = colors.previewTimeBackgroundColor,
+        ) {
+            PreviewTimeText("12:34", colors.previewTimeTextColor)
+        }
+    }
+}
+
+/**
+ * 浮窗内容: 启用预览帧时, 在时间上方显示固定尺寸的帧图区域 (帧未加载时显示占位背景,
+ * 保证浮窗大小从出现起就固定, 不随帧的加载而跳动); 未启用时只显示时间.
+ */
+@Composable
+fun PreviewFrameAndTimeText(
+    frame: ImageBitmap?,
+    text: String,
+    previewTimeTextColor: Color,
+    showFrameArea: Boolean = frame != null,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (showFrameArea) {
+            Box(
+                Modifier
+                    .padding(bottom = 8.dp)
+                    .size(width = 160.dp, height = 90.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (frame != null) {
+                    Image(
+                        frame,
+                        contentDescription = null,
+                        Modifier
+                            .matchParentSize()
+                            .testTag(TAG_PROGRESS_SLIDER_PREVIEW_FRAME),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+            }
+        }
+        PreviewTimeText(text, previewTimeTextColor)
+    }
+}
+
+/**
+ * Compact 播放器布局中显示在播放器中央的预览帧.
+ */
+@Composable
+fun ProgressSliderCenteredPreviewFrame(
+    frame: ImageBitmap?,
+    borderColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    if (frame == null) return
+
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        modifier
+            .size(width = 160.dp, height = 90.dp)
+            .clip(shape)
+            .background(Color.Black.copy(alpha = 0.3f))
+            .border(2.dp, borderColor, shape)
+            .testTag(TAG_PROGRESS_SLIDER_CENTERED_PREVIEW_FRAME),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            frame,
+            contentDescription = null,
+            Modifier.matchParentSize(),
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PreviewFrameAndTimeTextContent() = ProvideCompositionLocalsForPreview {
+    val colors = MediaProgressSliderDefaults.colors()
+    Box(
+        Modifier
+            .background(colors.previewTimeBackgroundColor)
+            .padding(16.dp),
+    ) {
+        PreviewFrameAndTimeText(
+            frame = null,
+            text = "12:34",
+            previewTimeTextColor = colors.previewTimeTextColor,
+            showFrameArea = true,
+        )
+    }
+}
+
+/**
+ * 判断进度条上 [ratio] (0..1) 处的内容是否已缓存完成.
+ *
+ * 无缓存信息 (null) 或空信息 (非 BT 源) 视为可用.
+ */
+internal fun MediaCacheProgressInfo?.isPositionCached(ratio: Float): Boolean {
+    if (this == null || isEmpty()) return true
+    var accumulated = 0f
+    for (i in 0..lastIndex) {
+        accumulated += chunkWeights[i]
+        if (ratio <= accumulated) return chunkStates[i] == ChunkState.DONE
+    }
+    return chunkStates[lastIndex] == ChunkState.DONE
+}
+
 @Composable
 fun PreviewTimeText(
     text: String,
     previewTimeTextColor: Color,
 ) {
-    ProvideTextStyle(MaterialTheme.typography.labelLarge) {
-        Text(
-            // 占位置
-            text = text,
-            Modifier.alpha(0f),
-            fontFamily = FontFamily.Monospace,
-        )
-        Text(
-            text = text,
-            color = previewTimeTextColor,
-            textAlign = TextAlign.Center,
-        )
+    Box(contentAlignment = Alignment.Center) {
+        ProvideTextStyle(MaterialTheme.typography.labelLarge) {
+            Text(
+                // 占位置
+                text = text,
+                Modifier.alpha(0f),
+                fontFamily = FontFamily.Monospace,
+            )
+            Text(
+                text = text,
+                color = previewTimeTextColor,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

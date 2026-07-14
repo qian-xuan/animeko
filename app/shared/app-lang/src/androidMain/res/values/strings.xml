@@ -258,6 +258,8 @@
     <string name="settings_player_fullscreen_only_in_controller">Do not show</string>
     <string name="settings_player_fullscreen_button">Show fullscreen button in portrait mode</string>
     <string name="settings_player_fullscreen_button_description">Always show the fullscreen toggle button in the lower-right corner of the player, for easy switching</string>
+    <string name="settings_player_frame_preview">Show frame preview on the progress bar</string>
+    <string name="settings_player_frame_preview_description">Show the video frame at the target position when hovering over or dragging the progress bar</string>
     <string name="settings_player_enable_regex_filter">Enable regex danmaku filter</string>
     <string name="settings_player_pause_on_edit_danmaku">Automatically pause playback when sending a danmaku</string>
     <string name="settings_player_auto_mark_done">Automatically mark as watched after 90% viewed</string>
@@ -267,6 +269,8 @@
     <string name="settings_player_auto_skip_op_ed">Automatically skip OP and ED</string>
     <string name="settings_player_auto_skip_op_ed_description">Only works for some resources from BT data sources</string>
     <string name="settings_player_auto_switch_media_on_error">Automatically switch resources on playback failure</string>
+    <string name="settings_player_experimental_hls_segment_filter">Filter inserted ads (experimental)</string>
+    <string name="settings_player_experimental_hls_segment_filter_description">Attempts to filter inserted ads from some online sources. Only works when ads are inserted as separate segments; incorrect detection may skip normal content.</string>
     <string name="settings_player_long_press_fast_forward_speed">Long-press fast-forward speed</string>
     <string name="settings_player_long_press_fast_forward_speed_description">Speed when long-pressing to fast-forward</string>
     <string name="settings_storage_title">Storage settings</string>
@@ -425,9 +429,12 @@
     <string name="settings_update_popup_auto_update">Auto-update</string>
     <string name="settings_update_popup_close">Close</string>
     <string name="settings_update_popup_downloading">Downloading Update</string>
+    <string name="settings_update_popup_installing">Installing Update</string>
     <string name="settings_update_popup_cancel_download">Cancel Download?</string>
+    <string name="settings_update_popup_cancel_install">Cancel Update?</string>
     <string name="settings_update_popup_cancel">Cancel</string>
     <string name="settings_update_popup_continue_download">Continue Download</string>
+    <string name="settings_update_popup_continue_update">Continue Update</string>
     <string name="settings_update_popup_restart_update">Restart to Update</string>
     <string name="settings_update_popup_download_complete">Download Complete</string>
 
@@ -477,6 +484,10 @@
     <string name="settings_theme_always_dark_episode_description">Provides a more immersive playback experience</string>
     <string name="settings_theme_dynamic_subject">Use Dynamic Theme in Item Detail Page</string>
     <string name="settings_theme_dynamic_subject_description">Generate dynamic theme based on cover image</string>
+    <string name="settings_theme_animated_gradient_subject">Animated Gradient Background in Item Detail Page</string>
+    <string name="settings_theme_animated_gradient_subject_description">Generate animated gradient background based on cover image. Enabling this may increase device temperature and battery usage</string>
+    <string name="settings_theme_frosted_glass">Frosted Glass Top and Navigation Bars</string>
+    <string name="settings_theme_frosted_glass_description">Use a blurred translucent background for the top app bar and navigation bar</string>
     <string name="settings_theme_palette">Color Palette</string>
     <string name="settings_theme_mode_light">Light</string>
     <string name="settings_theme_mode_dark">Dark</string>
@@ -670,6 +681,27 @@
     <string name="video_player_speed">Speed</string>
     <string name="video_player_skip_op_ed">Skipping OP or ED soon</string>
     <string name="video_player_cancel">Cancel</string>
+    <string name="video_player_stats_title">Playback Info</string>
+    <string name="video_player_stats_title_show">Show Playback Info</string>
+    <string name="video_player_stats_title_hide">Hide Playback Info</string>
+    <string name="video_player_stats_hide_hint">Tab to hide</string>
+    <string name="video_player_stats_backend">Backend</string>
+    <string name="video_player_stats_state">State</string>
+    <string name="video_player_stats_media_title">Title</string>
+    <string name="video_player_stats_progress">Progress</string>
+    <string name="video_player_stats_resolution">Resolution</string>
+    <string name="video_player_stats_frame_rate">Frame rate</string>
+    <string name="video_player_stats_video_codec">Video codec</string>
+    <string name="video_player_stats_video_bitrate">Video bitrate</string>
+    <string name="video_player_stats_audio_codec">Audio codec</string>
+    <string name="video_player_stats_audio_bitrate">Audio bitrate</string>
+    <string name="video_player_stats_audio_format">Audio format</string>
+    <string name="video_player_stats_playback_speed">Speed</string>
+    <string name="video_player_stats_realtime_input">Input bitrate</string>
+    <string name="video_player_stats_realtime_demux">Demux bitrate</string>
+    <string name="video_player_stats_decode_stats">Decode stats</string>
+    <string name="video_player_stats_dropped_video_frames">Dropped %1$s</string>
+    <string name="video_player_stats_dropped_audio_buffers">Audio lost %1$s</string>
     <string name="video_player_danmaku_placeholder_1">Send a danmaku~</string>
     <string name="video_player_danmaku_placeholder_2">Careful, I\'m about to launch a danmaku!</string>
     <string name="video_player_danmaku_placeholder_3">Every danmaku hides a secret</string>
@@ -870,14 +902,32 @@
     <string name="subject_details_characters_with_count">Characters %1$d</string>
     <string name="subject_details_staff">Staff</string>
     <string name="subject_details_staff_with_count">Staff %1$d</string>
-    <string name="subject_details_related_subjects">Related titles</string>
+    <string name="subject_details_related_subjects">Related</string>
     <string name="subject_details_show_less">Show less</string>
     <string name="subject_details_show_more">Show more</string>
     <string name="subject_details_view_all">View all</string>
+    <string name="subject_details_episodes">Episodes</string>
+    <string name="subject_details_rating">Rating</string>
+    <string name="subject_details_hot_reviews">Popular reviews</string>
+    <string name="subject_details_info">Information</string>
+    <string name="subject_details_air_date">Aired</string>
+    <string name="subject_details_air_weekday">Broadcast</string>
+    <string name="subject_details_total_episodes">Episodes</string>
+    <string name="subject_details_aliases">Aliases</string>
+    <string name="subject_details_stat_collected">Collected</string>
+    <string name="subject_details_stat_watching">Watching</string>
+    <string name="subject_details_stat_wish">Plan to watch</string>
     <string name="subject_details_relation_prequel">Prequel</string>
     <string name="subject_details_relation_sequel">Sequel</string>
     <string name="subject_details_relation_derived">Spin-off</string>
     <string name="subject_details_relation_special">Special</string>
+    <string name="subject_details_prev_page">Previous page</string>
+    <string name="subject_details_next_page">Next page</string>
+    <string name="subject_details_air_date_format">%1$s/%2$s/%3$s</string>
+    <string name="subject_details_rating_summary">#%1$s · %2$s ratings</string>
+    <string name="subject_details_reviews_count">%1$s reviews</string>
+    <string name="subject_details_rate">Rate</string>
+    <string name="subject_details_summary">Summary</string>
     <string name="foundation_load_error_network">Network error</string>
     <string name="foundation_load_error_rate_limited">You\'re doing that too fast. Please try again</string>
     <string name="foundation_load_error_service_unavailable">Service unavailable</string>
@@ -1207,6 +1257,30 @@
     <string name="subject_episode_video_settings_enable_regex_filter">Enable regex danmaku filters</string>
     <string name="subject_episode_video_settings_manage_regex_filter">Manage regex danmaku filters</string>
     <string name="subject_episode_video_settings_debug_mode">Danmaku debug mode</string>
+
+    <!-- Person / character details pages -->
+    <string name="person_details_basic_info">Basic info</string>
+    <string name="person_details_voice_actors">Voice actors</string>
+    <string name="person_details_casts">Characters</string>
+    <string name="person_details_works">Works</string>
+    <string name="person_details_character_subjects">Appears in</string>
+    <string name="person_details_comments">Comments</string>
+    <string name="person_details_comments_count">%1$s comments</string>
+    <string name="person_details_meta">%1$s · collected by %2$s</string>
+    <string name="person_details_open_full_page">Open full page</string>
+    <string name="person_details_no_comments">No comments yet</string>
+    <string name="person_details_person">Person</string>
+    <string name="person_details_role_character">Character</string>
+    <string name="person_details_role_mecha">Mecha</string>
+    <string name="person_details_role_ship">Ship</string>
+    <string name="person_details_role_organization">Organization</string>
+    <string name="person_details_career_seiyu">Voice actor</string>
+    <string name="person_details_career_producer">Staff</string>
+    <string name="person_details_career_mangaka">Manga artist</string>
+    <string name="person_details_career_artist">Artist</string>
+    <string name="person_details_career_writer">Writer</string>
+    <string name="person_details_career_illustrator">Illustrator</string>
+    <string name="person_details_career_actor">Actor</string>
 </resources>
 
 <!--@formatter:on-->

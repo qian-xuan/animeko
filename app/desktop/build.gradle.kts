@@ -12,6 +12,7 @@ import org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask
 import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 import org.jetbrains.compose.reload.gradle.ComposeHotRun
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
+import java.nio.file.Files
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -32,11 +33,11 @@ dependencies {
     implementation(libs.compose.components.resources)
     implementation(libs.compose.native.tray)
     implementation(libs.log4j.core)
-    implementation(libs.vlcj)
     implementation(libs.jsystemthemedetector)
     implementation(libs.bytebuddy.agent)
     implementation(libs.bytebuddy)
     implementation(libs.mediamp.ffmpeg.desktop)
+
     when (val triple = getOsTriple()) {
         "windows-x64" -> runtimeOnly(libs.mediamp.ffmpeg.runtime.windows.x64)
         "linux-x64" -> runtimeOnly(libs.mediamp.ffmpeg.runtime.linux.x64)
@@ -44,6 +45,23 @@ dependencies {
         "macos-arm64" -> runtimeOnly(libs.mediamp.ffmpeg.runtime.macos.arm64)
         else -> throw UnsupportedOperationException("Unknown os: $triple")
     }
+
+    if (getLocalProperty("ani.build.mediamp.path") != null) {
+        runtimeOnly(libs.mediamp.mpv) {
+            capabilities {
+                requireCapability("org.openani.mediamp:mediamp-mpv-runtime-${getOsTriple()}")
+            }
+        }
+    } else {
+        when (val triple = getOsTriple()) {
+            "windows-x64" -> runtimeOnly(libs.mediamp.mpv.runtime.windows.x64)
+            "macos-arm64" -> runtimeOnly(libs.mediamp.mpv.runtime.macos.arm64)
+            else -> {}
+        }
+    }
+
+    // vlcj 依赖里没有 native libraries，依赖是手动放的
+    implementation(libs.vlcj)
 }
 
 // workaround for compose limitation
@@ -255,30 +273,34 @@ afterEvaluate {
         }
 
         Os.MacOS -> {
-            tasks.named("createReleaseDistributable", AbstractJPackageTask::class) {
-                val dirsNames = listOf(
-                    // From your (JBR's) Java Home to Packed Java Home 
-                    "../Frameworks" to "Contents/runtime/Contents",
-                )
+            // JCEF needs the JBR's Contents/Frameworks (CEF framework + helpers) next to the packed
+            // runtime's Home; jpackage only copies Home, so the app crashes at JCEF init without this.
+            listOf("createDistributable", "createReleaseDistributable").forEach { taskName ->
+                tasks.named(taskName, AbstractJPackageTask::class) {
+                    val dirsNames = listOf(
+                        // From your (JBR's) Java Home to Packed Java Home
+                        "../Frameworks" to "Contents/runtime/Contents",
+                    )
 
-                dirsNames.forEach { (sourcePath, destPath) ->
-                    val source = File(javaHome.get()).resolve(sourcePath).normalize()
-                    inputs.dir(source)
-                    doLast("copy $sourcePath") {
-                        val appBundle =
-                            destinationDir.get().asFile.walk().find { it.name.endsWith(".app") && it.isDirectory }
-                        var dest = appBundle?.resolve(destPath)?.normalize()
-                            ?: throw GradleException("Cannot find .app bundle in $appBundle")
-                        ProcessBuilder().run {
-                            command("cp", "-r", source.absolutePath, dest.absolutePath)
-                            inheritIO()
-                            start()
-                        }.waitFor().let {
-                            if (it != 0) {
-                                throw GradleException("Failed to copy $sourcePath")
+                    dirsNames.forEach { (sourcePath, destPath) ->
+                        val source = File(javaHome.get()).resolve(sourcePath).normalize()
+                        inputs.dir(source)
+                        doLast("copy $sourcePath") {
+                            val appBundle =
+                                destinationDir.get().asFile.walk().find { it.name.endsWith(".app") && it.isDirectory }
+                            var dest = appBundle?.resolve(destPath)?.normalize()
+                                ?: throw GradleException("Cannot find .app bundle in $appBundle")
+                            ProcessBuilder().run {
+                                command("cp", "-r", source.absolutePath, dest.absolutePath)
+                                inheritIO()
+                                start()
+                            }.waitFor().let {
+                                if (it != 0) {
+                                    throw GradleException("Failed to copy $sourcePath")
+                                }
                             }
+                            logger.info("Copied $source to $dest")
                         }
-                        logger.info("Copied $source to $dest")
                     }
                 }
             }
@@ -346,6 +368,7 @@ tasks.withType(AbstractJPackageTask::class) {
         destinationDir.get().asFile
             .walk()
             .filter(::isRuntimePayloadJar)
+            .toList()
             .forEach { jar ->
                 unpackJar(jar, jar.parentFile) {
                     !(it.name.contains("MANIFEST") || it.name.contains("META-INF"))
@@ -356,6 +379,33 @@ tasks.withType(AbstractJPackageTask::class) {
                     "Extracted ${jar.name} into ${jar.parentFile} and deleted the jars",
                 )
             }
+
+        if (triple == "linux-x64") {
+            destinationDir.get().asFile
+                .walk()
+                .filter { it.isDirectory && it.name == "app" && it.parentFile.name == "lib" }
+                .flatMap { it.walk() }
+                .filter { it.isFile && it.name.startsWith("lib") && it.extension == "so" }
+                .forEach { library ->
+                    val process = ProcessBuilder("readelf", "-d", library.absolutePath)
+                        .redirectErrorStream(true)
+                        .start()
+                    val readElf = process.inputStream.bufferedReader().use { it.readText() }
+                    if (process.waitFor() != 0) return@forEach
+                    val soname = Regex("Library soname: \\[(.+)]")
+                        .find(readElf)
+                        ?.groupValues
+                        ?.get(1)
+                        ?: return@forEach
+                    if (soname == library.name) return@forEach
+
+                    val alias = library.toPath().resolveSibling(soname)
+                    if (Files.notExists(alias)) {
+                        Files.createSymbolicLink(alias, library.toPath().fileName)
+                        logger.lifecycle("Created SONAME alias $alias -> ${library.name}")
+                    }
+                }
+        }
     }
 }
 
@@ -381,7 +431,10 @@ afterEvaluate {
 }
 
 fun JavaExec.configureDevProperties() {
-    mainClass.set("me.him188.ani.app.desktop.AniDesktop")
+    // Override to run scratch mains (e.g. FullscreenTest): ./gradlew :app:desktop:run -Pani.desktop.mainClass=...
+    mainClass.set(
+        providers.gradleProperty("ani.desktop.mainClass").getOrElse("me.him188.ani.app.desktop.AniDesktop"),
+    )
     this.jvmArgs(
 //        "-XX:+UseZGC", // this may crash the VM
         "-Xmx512m",

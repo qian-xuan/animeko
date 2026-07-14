@@ -271,6 +271,8 @@
     <string name="settings_player_fullscreen_only_in_controller">不显示</string>
     <string name="settings_player_fullscreen_button">竖屏模式下显示全屏按钮</string>
     <string name="settings_player_fullscreen_button_description">总是显示播放器右下角的切换全屏按钮，方便切换</string>
+    <string name="settings_player_frame_preview">显示进度条画面预览</string>
+    <string name="settings_player_frame_preview_description">悬停或拖动进度条时，显示目标位置的视频画面</string>
     <string name="settings_player_enable_regex_filter">启用正则弹幕过滤器</string>
     <string name="settings_player_pause_on_edit_danmaku">发送弹幕时自动暂停播放</string>
     <string name="settings_player_auto_mark_done">观看 90% 后自动标记为看过</string>
@@ -280,6 +282,8 @@
     <string name="settings_player_auto_skip_op_ed">自动跳过 OP 和 ED</string>
     <string name="settings_player_auto_skip_op_ed_description">只对 BT 数据源的部分资源有效</string>
     <string name="settings_player_auto_switch_media_on_error">播放失败时自动切换资源</string>
+    <string name="settings_player_experimental_hls_segment_filter">过滤贴片广告（实验性）</string>
+    <string name="settings_player_experimental_hls_segment_filter_description">尝试过滤部分在线源插入的贴片广告。只对以独立片段插入的广告有效，识别错误时可能跳过正常内容。</string>
     <string name="settings_player_long_press_fast_forward_speed">长按快进速度</string>
     <string name="settings_player_long_press_fast_forward_speed_description">长按快进时的速度倍率</string>
 
@@ -473,9 +477,12 @@
     <string name="settings_update_popup_auto_update">自动更新</string>
     <string name="settings_update_popup_close">关闭</string>
     <string name="settings_update_popup_downloading">正在下载更新</string>
+    <string name="settings_update_popup_installing">正在安装更新</string>
     <string name="settings_update_popup_cancel_download">要取消下载吗?</string>
+    <string name="settings_update_popup_cancel_install">要取消更新吗?</string>
     <string name="settings_update_popup_cancel">取消</string>
     <string name="settings_update_popup_continue_download">继续下载</string>
+    <string name="settings_update_popup_continue_update">继续更新</string>
     <string name="settings_update_popup_restart_update">重启更新</string>
     <string name="settings_update_popup_download_complete">下载完成</string>
 
@@ -517,6 +524,10 @@
     <string name="settings_theme_always_dark_episode_description">提供更加沉浸的播放体验</string>
     <string name="settings_theme_dynamic_subject">条目详情页使用动态主题</string>
     <string name="settings_theme_dynamic_subject_description">根据封面生成动态主题</string>
+    <string name="settings_theme_animated_gradient_subject">条目详情页动态渐变背景</string>
+    <string name="settings_theme_animated_gradient_subject_description">根据封面生成动态渐变背景。开启后可能导致设备发热和耗电增加</string>
+    <string name="settings_theme_frosted_glass">顶栏和导航栏毛玻璃效果</string>
+    <string name="settings_theme_frosted_glass_description">为顶栏和导航栏使用模糊的半透明背景</string>
     <string name="settings_theme_palette">调色板</string>
     <string name="settings_theme_mode_light">浅色</string>
     <string name="settings_theme_mode_dark">深色</string>
@@ -710,6 +721,27 @@
     <string name="video_player_speed">倍速</string>
     <string name="video_player_skip_op_ed">即将跳过 OP 或 ED</string>
     <string name="video_player_cancel">取消</string>
+    <string name="video_player_stats_title">播放信息</string>
+    <string name="video_player_stats_title_show">显示播放信息</string>
+    <string name="video_player_stats_title_hide">隐藏播放信息</string>
+    <string name="video_player_stats_hide_hint">Tab 隐藏</string>
+    <string name="video_player_stats_backend">后端</string>
+    <string name="video_player_stats_state">状态</string>
+    <string name="video_player_stats_media_title">标题</string>
+    <string name="video_player_stats_progress">进度</string>
+    <string name="video_player_stats_resolution">分辨率</string>
+    <string name="video_player_stats_frame_rate">帧率</string>
+    <string name="video_player_stats_video_codec">视频编码</string>
+    <string name="video_player_stats_video_bitrate">视频码率</string>
+    <string name="video_player_stats_audio_codec">音频编码</string>
+    <string name="video_player_stats_audio_bitrate">音频码率</string>
+    <string name="video_player_stats_audio_format">音频格式</string>
+    <string name="video_player_stats_playback_speed">播放速度</string>
+    <string name="video_player_stats_realtime_input">实时输入</string>
+    <string name="video_player_stats_realtime_demux">实时解复用</string>
+    <string name="video_player_stats_decode_stats">解码统计</string>
+    <string name="video_player_stats_dropped_video_frames">丢帧 %1$s</string>
+    <string name="video_player_stats_dropped_audio_buffers">音频丢包 %1$s</string>
     <string name="video_player_danmaku_placeholder_1">来发一条弹幕吧~</string>
     <string name="video_player_danmaku_placeholder_2">小心，我要发射弹幕啦！</string>
     <string name="video_player_danmaku_placeholder_3">每一条弹幕背后，都有一个不为人知的秘密</string>
@@ -914,10 +946,28 @@
     <string name="subject_details_show_less">显示更少</string>
     <string name="subject_details_show_more">显示更多</string>
     <string name="subject_details_view_all">查看全部</string>
+    <string name="subject_details_episodes">选集</string>
+    <string name="subject_details_rating">评分</string>
+    <string name="subject_details_hot_reviews">热门评价</string>
+    <string name="subject_details_info">作品信息</string>
+    <string name="subject_details_air_date">放送开始</string>
+    <string name="subject_details_air_weekday">放送星期</string>
+    <string name="subject_details_total_episodes">话数</string>
+    <string name="subject_details_aliases">别名</string>
+    <string name="subject_details_stat_collected">收藏</string>
+    <string name="subject_details_stat_watching">在看</string>
+    <string name="subject_details_stat_wish">想看</string>
     <string name="subject_details_relation_prequel">前传</string>
     <string name="subject_details_relation_sequel">续集</string>
     <string name="subject_details_relation_derived">衍生</string>
     <string name="subject_details_relation_special">番外篇</string>
+    <string name="subject_details_prev_page">上一页</string>
+    <string name="subject_details_next_page">下一页</string>
+    <string name="subject_details_air_date_format">%1$s 年 %2$s 月 %3$s 日</string>
+    <string name="subject_details_rating_summary">#%1$s · %2$s 人评分</string>
+    <string name="subject_details_reviews_count">%1$s 条</string>
+    <string name="subject_details_rate">打分</string>
+    <string name="subject_details_summary">简介</string>
     <string name="foundation_load_error_network">网络错误</string>
     <string name="foundation_load_error_rate_limited">操作过快，请重试</string>
     <string name="foundation_load_error_service_unavailable">服务暂不可用</string>
@@ -1247,6 +1297,30 @@
     <string name="subject_episode_video_settings_enable_regex_filter">启用正则弹幕过滤器</string>
     <string name="subject_episode_video_settings_manage_regex_filter">管理正则弹幕过滤器</string>
     <string name="subject_episode_video_settings_debug_mode">弹幕调试模式</string>
+
+    <!-- 人物/角色详情页 -->
+    <string name="person_details_basic_info">基本信息</string>
+    <string name="person_details_voice_actors">声优</string>
+    <string name="person_details_casts">出演角色</string>
+    <string name="person_details_works">参与作品</string>
+    <string name="person_details_character_subjects">出演作品</string>
+    <string name="person_details_comments">评论</string>
+    <string name="person_details_comments_count">%1$s 条</string>
+    <string name="person_details_meta">%1$s · %2$s 人收藏</string>
+    <string name="person_details_open_full_page">打开完整页面</string>
+    <string name="person_details_no_comments">还没有评论</string>
+    <string name="person_details_person">人物</string>
+    <string name="person_details_role_character">角色</string>
+    <string name="person_details_role_mecha">机体</string>
+    <string name="person_details_role_ship">舰船</string>
+    <string name="person_details_role_organization">组织</string>
+    <string name="person_details_career_seiyu">声优</string>
+    <string name="person_details_career_producer">制作人员</string>
+    <string name="person_details_career_mangaka">漫画家</string>
+    <string name="person_details_career_artist">艺术家</string>
+    <string name="person_details_career_writer">作家</string>
+    <string name="person_details_career_illustrator">绘师</string>
+    <string name="person_details_career_actor">演员</string>
 </resources>
 
 <!--@formatter:on-->
