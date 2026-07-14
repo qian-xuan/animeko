@@ -193,10 +193,12 @@ internal fun EpisodeVideoImpl(
     playbackSpeedControllerState: PlaybackSpeedControllerState?,
     videoAspectRatioControllerState: VideoAspectRatioControllerState?,
     leftBottomTips: @Composable () -> Unit,
+    syncplayStatusIndicator: @Composable () -> Unit = {}, // T6.x: wire SyncplayStatusIndicator when SyncplayViewModel is integrated
     fullscreenSwitchButton: @Composable () -> Unit,
     sideSheets: @Composable (controller: VideoSideSheetsController<EpisodeVideoSideSheetPage>) -> Unit,
     shareData: MediaShareData,
     onClickCache: () -> Unit,
+    onClickWatchTogether: () -> Unit = {}, // T6.2: wire to JoinRoomDialog
     modifier: Modifier = Modifier,
     maintainAspectRatio: Boolean = !expanded,
     isFullscreen: Boolean = expanded,
@@ -256,6 +258,7 @@ internal fun EpisodeVideoImpl(
                                 onToggleSidebar = onToggleSidebar,
                                 playerStatsVisible = showPlayerStats,
                                 onTogglePlayerStats = { showPlayerStats = !showPlayerStats },
+                                onClickWatchTogether = onClickWatchTogether,
                             )
                         },
                         // VideoScaffold already applies top/horizontal insets around the top bar.
@@ -500,6 +503,7 @@ internal fun EpisodeVideoImpl(
             floatingBottomEnd = { fullscreenSwitchButton() },
             rhsSheet = { sideSheets(sheetsController) },
             leftBottomTips = leftBottomTips,
+            syncplayStatusIndicator = syncplayStatusIndicator,
         )
     }
 }
@@ -517,6 +521,7 @@ private fun EpisodeVideoTopBarActions(
     onToggleSidebar: (isCollapsed: Boolean) -> Unit,
     playerStatsVisible: Boolean,
     onTogglePlayerStats: () -> Unit,
+    onClickWatchTogether: () -> Unit = {}, // T6.2: wire to JoinRoomDialog
 ) {
     var showShareDropdown by rememberSaveable { mutableStateOf(false) }
     var showMoreDropdown by rememberSaveable { mutableStateOf(false) }
@@ -597,6 +602,14 @@ private fun EpisodeVideoTopBarActions(
                     onClickCache()
                 },
                 leadingIcon = { Icon(Icons.Rounded.Download, null) },
+            )
+            // T6.3: i18n for "一起看"
+            DropdownMenuItem(
+                text = { Text("一起看") },
+                onClick = {
+                    showMoreDropdown = false
+                    onClickWatchTogether() // T6.2: open JoinRoomDialog
+                },
             )
         }
         ShareEpisodeDropdown(

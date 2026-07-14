@@ -84,6 +84,11 @@ fun VideoScaffold(
     gestureLocked: Boolean = false,
     topBar: @Composable RowScope.() -> Unit = {},
     /**
+     * 一起看 (Watch Together) 状态指示器, 显示在顶部栏下方居中位置.
+     * 当 Syncplay 会话活跃时传入 [me.him188.ani.app.ui.syncplay.SyncplayStatusIndicator].
+     */
+    syncplayStatusIndicator: @Composable () -> Unit = {},
+    /**
      * @see VideoPlayer
      */
     video: @Composable BoxScope.() -> Unit = {},
@@ -200,6 +205,13 @@ fun VideoScaffold(
                                     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
                                         topBar()
                                     }
+                                }
+                                // 一起看状态指示器
+                                Box(
+                                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                                    contentAlignment = Alignment.TopCenter,
+                                ) {
+                                    syncplayStatusIndicator()
                                 }
                                 Spacer(Modifier.height(16.dp))
                             }
