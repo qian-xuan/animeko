@@ -74,6 +74,7 @@ import me.him188.ani.app.data.repository.subject.SubjectSearchCompletionReposito
 import me.him188.ani.app.data.repository.subject.SubjectRelationsRepository
 import me.him188.ani.app.data.repository.subject.SubjectSearchHistoryRepository
 import me.him188.ani.app.data.repository.subject.SubjectSearchRepository
+import me.him188.ani.app.data.repository.syncplay.SyncplaySettingsRepository
 import me.him188.ani.app.data.repository.torrent.peer.PeerFilterSubscriptionRepository
 import me.him188.ani.app.data.repository.user.AccessTokenSession
 import me.him188.ani.app.data.repository.user.PreferencesRepositoryImpl
@@ -128,6 +129,9 @@ import me.him188.ani.app.ui.subject.details.state.SubjectDetailsStateFactory
 import me.him188.ani.datasources.bangumi.BangumiClient
 import me.him188.ani.datasources.bangumi.BangumiClientImpl
 import me.him188.ani.datasources.bangumi.turnstileBaseUrl
+import me.him188.ani.syncplay.engine.SyncplayController
+import me.him188.ani.syncplay.engine.createSyncplayNetworkManager
+import me.him188.ani.syncplay.network.SyncplayNetworkManager
 import me.him188.ani.utils.coroutines.IO_
 import me.him188.ani.utils.coroutines.childScope
 import me.him188.ani.utils.coroutines.childScopeContext
@@ -381,6 +385,7 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
         )
     }
     single<SettingsRepository> { PreferencesRepositoryImpl(getContext().dataStores.preferencesStore) }
+    single<SyncplaySettingsRepository> { SyncplaySettingsRepository(getContext().dataStores.preferencesStore) }
     single<DanmakuRegexFilterRepository> { DanmakuRegexFilterRepositoryImpl(getContext().dataStores.danmakuFilterStore) }
     single<MikanIndexCacheRepository> { MikanIndexCacheRepositoryImpl(getContext().dataStores.mikanIndexStore) }
 
@@ -499,6 +504,10 @@ private fun KoinApplication.otherModules(getContext: () -> Context, coroutineSco
     // Caching
     single<MeteredNetworkDetector> { createMeteredNetworkDetector(getContext()) }
     single<SubjectDetailsStateFactory> { DefaultSubjectDetailsStateFactory() }
+
+    // Syncplay
+    single<SyncplayNetworkManager> { createSyncplayNetworkManager(coroutineScope) }
+    single<SyncplayController> { SyncplayController(get(), coroutineScope) }
 
     factory<TurnstileState> {
         CreateTurnstileState(

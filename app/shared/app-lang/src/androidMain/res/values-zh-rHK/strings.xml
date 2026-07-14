@@ -1296,6 +1296,25 @@
     <string name="person_details_career_writer">作家</string>
     <string name="person_details_career_illustrator">繪師</string>
     <string name="person_details_career_actor">演員</string>
+
+    <!-- Syncplay -->
+    <string name="syncplay_join_room_title">加入 Syncplay 房間</string>
+    <string name="syncplay_room_name">房間名</string>
+    <string name="syncplay_room_name_invalid">房間名需為 6-10 個字元</string>
+    <string name="syncplay_username">用戶名</string>
+    <string name="syncplay_username_invalid">用戶名需為 4-12 個字元</string>
+    <string name="syncplay_server">伺服器</string>
+    <string name="syncplay_use_tls">啟用 TLS</string>
+    <string name="syncplay_join">加入</string>
+    <string name="syncplay_cancel">取消</string>
+    <string name="syncplay_waiting_for_peers">等待其他用戶加入…</string>
+    <string name="syncplay_ready">已就緒</string>
+    <string name="syncplay_controller">房主</string>
+    <string name="syncplay_status_connected">已連接</string>
+    <string name="syncplay_status_connecting">連接中…</string>
+    <string name="syncplay_status_disconnected">已斷開</string>
+    <string name="syncplay_chat_placeholder">輸入訊息…</string>
+    <string name="syncplay_chat_send">發送</string>
 </resources>
 
 <!--@formatter:on-->

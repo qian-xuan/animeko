@@ -1281,6 +1281,25 @@
     <string name="person_details_career_writer">Writer</string>
     <string name="person_details_career_illustrator">Illustrator</string>
     <string name="person_details_career_actor">Actor</string>
+
+    <!-- Syncplay -->
+    <string name="syncplay_join_room_title">Join Syncplay Room</string>
+    <string name="syncplay_room_name">Room name</string>
+    <string name="syncplay_room_name_invalid">Room name must be 6-10 characters</string>
+    <string name="syncplay_username">Username</string>
+    <string name="syncplay_username_invalid">Username must be 4-12 characters</string>
+    <string name="syncplay_server">Server</string>
+    <string name="syncplay_use_tls">Use TLS</string>
+    <string name="syncplay_join">Join</string>
+    <string name="syncplay_cancel">Cancel</string>
+    <string name="syncplay_waiting_for_peers">Waiting for peers…</string>
+    <string name="syncplay_ready">Ready</string>
+    <string name="syncplay_controller">Room controller</string>
+    <string name="syncplay_status_connected">Connected</string>
+    <string name="syncplay_status_connecting">Connecting…</string>
+    <string name="syncplay_status_disconnected">Disconnected</string>
+    <string name="syncplay_chat_placeholder">Type a message…</string>
+    <string name="syncplay_chat_send">Send</string>
 </resources>
 
 <!--@formatter:on-->

@@ -97,6 +97,7 @@ import me.him188.ani.app.domain.player.extension.MarkAsWatchedExtension
 import me.him188.ani.app.domain.player.extension.ObserveWebMediaSourcePreferenceExtension
 import me.him188.ani.app.domain.player.extension.RememberPlayProgressExtension
 import me.him188.ani.app.domain.player.extension.SaveMediaPreferenceExtension
+import me.him188.ani.app.domain.player.extension.SyncplayPlayerExtension
 import me.him188.ani.app.domain.player.extension.SwitchMediaOnPlayerErrorExtension
 import me.him188.ani.app.domain.player.extension.SwitchNextEpisodeExtension
 import me.him188.ani.app.domain.settings.GetDanmakuRegexFilterListFlowUseCase
@@ -301,6 +302,7 @@ class EpisodeViewModel(
                 },
             ),
             SwitchMediaOnPlayerErrorExtension,
+            SyncplayPlayerExtension,
             AutoSelectExtension,
             SaveMediaPreferenceExtension,
             ObserveWebMediaSourcePreferenceExtension,
