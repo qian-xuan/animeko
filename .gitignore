@@ -44,3 +44,7 @@ kls_database.db
 /app/ios/12.4.0
 /app/ios/xcb2.log
 /app/ios/xcodebuild.log
+AGENTS.md
+.omo/run-continuation/ses_0da3d96edffeVTw8nGOmeKX3jT.json
+docs/project-structure-and-tech-stack.md
+.gitignore
