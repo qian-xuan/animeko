@@ -148,17 +148,21 @@ class SyncplayMessageHandler(
             val pos = position
             val isPaused = paused
             val now = Clock.System.now()
+            // Read real player state from the controller (which the bridge updates).
+            val controller = callback as? SyncplayController
+            val localPosSec = (controller?.playerPositionMs ?: 0L) / 1000.0
+            val mediaLoaded = controller?.mediaLoaded ?: false
             val actions = decideAction(
                 paused = isPaused,
                 position = pos,
                 doSeek = doSeek,
                 setBy = setBy,
                 messageAge = messageAge,
-                localPositionSec = 0.0,
+                localPositionSec = localPosSec,
                 currentUsername = session.currentUsername,
                 globalPaused = protocol.globalPaused,
                 lastGlobalUpdate = protocol.lastGlobalUpdate,
-                mediaLoaded = false,
+                mediaLoaded = mediaLoaded,
                 speedChanged = protocol.speedChanged,
                 canFastForward = false,
                 behindFirstDetected = protocol.behindFirstDetected,

@@ -73,11 +73,14 @@ class SyncplayPlayerExtension private constructor(
         //    monitor sees the real player state. On a pause/play transition, sends a
         //    State packet unless the change was sync-driven (anti-loop suppresses it),
         //    AND only when the controller is actually connected to a server.
+        //    Also updates controller.playerPositionMs and controller.mediaLoaded so the
+        //    engine's decideAction can use the real local position and media state.
         backgroundTaskScope.launch("PlaybackStateBridge") {
             var wasPlaying = player.playbackState.value.isPlaying
             player.playbackState.collect { state ->
                 val isPlaying = state.isPlaying
                 controller.isPlayingFlow.value = isPlaying
+                controller.mediaLoaded = true
 
                 if (isPlaying != wasPlaying) {
                     if (!antiLoop.shouldSuppressPlaybackOutbound()
@@ -96,12 +99,25 @@ class SyncplayPlayerExtension private constructor(
         //    has started) is treated as a user-initiated seek and broadcast to the room.
         //    Sync-driven seeks are suppressed via the seek-suppression window.
         //    Only active when connected to a server.
+        //    Also updates controller.playerPositionMs so the engine's decideAction can
+        //    compute the real diff between local and global position.
         backgroundTaskScope.launch("PositionBridge") {
             var lastPosMs = 0L
+            var wasSuppressing = false
             player.currentPositionMillis.collect { pos ->
+                controller.playerPositionMs = pos
                 val nowMs = Clock.System.now().toEpochMilliseconds()
                 if (antiLoop.shouldSuppressPositionOutbound(pos, nowMs)) {
                     lastPosMs = pos
+                    wasSuppressing = true
+                    return@collect
+                }
+                // If the suppression window just closed, skip the delta check for this
+                // one emission — the position jump is from the sync-driven seek, not a
+                // user action. Without this, the huge delta triggers a spurious sendSeek.
+                if (wasSuppressing) {
+                    lastPosMs = pos
+                    wasSuppressing = false
                     return@collect
                 }
                 if (controller.state.value != me.him188.ani.syncplay.protocol.models.ConnectionState.CONNECTED) {

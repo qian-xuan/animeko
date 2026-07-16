@@ -73,6 +73,23 @@ class SyncplayController(
     var playerBridge: RoomCallback? = null
 
     /**
+     * The player's current position in milliseconds. Updated by [SyncplayPlayerExtension]'s
+     * PositionBridge coroutine. Read by [SyncplayMessageHandler.onState] to supply the real
+     * `localPositionSec` to [decideAction] (instead of the 0.0 stub).
+     */
+    @Volatile
+    var playerPositionMs: Long = 0L
+
+    /**
+     * Whether media is loaded in the player. Updated by [SyncplayPlayerExtension].
+     * Read by [SyncplayMessageHandler.onState] to supply the real `mediaLoaded` to
+     * [decideAction] (instead of the `false` stub). When `true`, the first-sync path
+     * in [decideAction] can fire (snap to room position on first inbound State).
+     */
+    @Volatile
+    var mediaLoaded: Boolean = false
+
+    /**
      * Channel-health monitoring (list-probe, state watchdog, playback-broadcast). Lazy
      * because it is only needed while CONNECTED — [onConnected] starts it, [onDisconnected]
      * stops it.
