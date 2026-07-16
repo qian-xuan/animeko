@@ -132,6 +132,9 @@ import me.him188.ani.app.ui.lang.episode_comments
 import me.him188.ani.app.ui.lang.episode_comments_with_count
 import me.him188.ani.app.ui.lang.episode_send_danmaku
 import me.him188.ani.app.ui.lang.foundation_richtext_external_app_link_warning_prefix
+import me.him188.ani.app.ui.syncplay.JoinRoomDialog
+import me.him188.ani.app.ui.syncplay.SyncplayStatusIndicator
+import me.him188.ani.app.ui.syncplay.SyncplayViewModel
 import me.him188.ani.app.ui.lang.foundation_richtext_open_failed_prefix
 import me.him188.ani.app.ui.lang.subject_details_tab_details
 import me.him188.ani.app.ui.richtext.RichTextDefaults
@@ -163,10 +166,12 @@ import me.him188.ani.danmaku.api.DanmakuLocation
 import me.him188.ani.danmaku.ui.DanmakuHostState
 import me.him188.ani.danmaku.ui.DanmakuPresentation
 import me.him188.ani.datasources.api.source.MediaFetchRequest
+import me.him188.ani.syncplay.engine.SyncplayController
 import me.him188.ani.utils.platform.isAndroid
 import me.him188.ani.utils.platform.isDesktop
 import me.him188.ani.utils.platform.isIos
 import me.him188.ani.utils.platform.isMobile
+import org.koin.mp.KoinPlatform
 import org.jetbrains.compose.resources.stringResource
 import org.openani.mediamp.features.AudioLevelController
 import org.openani.mediamp.features.PlaybackSpeed
@@ -934,6 +939,13 @@ private fun EpisodeVideo(
         }
     }
 
+    // Syncplay ViewModel + join dialog state
+    val syncplayViewModel = remember {
+        SyncplayViewModel(KoinPlatform.getKoin().get<SyncplayController>())
+    }
+    var showJoinRoomDialog by rememberSaveable { mutableStateOf(false) }
+    val syncplayUiState by syncplayViewModel.uiState.collectAsStateWithLifecycle()
+
     EpisodeVideoImpl(
         vm.player,
         expanded = expanded,
@@ -1087,6 +1099,8 @@ private fun EpisodeVideo(
         },
         shareData = page.shareData,
         onClickCache = { navigator.navigateSubjectCaches(vm.subjectId) },
+        onClickWatchTogether = { showJoinRoomDialog = true },
+        syncplayStatusIndicator = { SyncplayStatusIndicator(syncplayUiState) },
         modifier = modifier
             .fillMaxWidth().background(Color.Black)
             .then(if (expanded) Modifier.fillMaxSize() else Modifier.statusBarsPadding()),
@@ -1094,6 +1108,14 @@ private fun EpisodeVideo(
         contentWindowInsets = windowInsets,
         fastForwardSpeed = vm.videoScaffoldConfig.fastForwardSpeed,
     )
+
+    // Syncplay join room dialog
+    if (showJoinRoomDialog) {
+        JoinRoomDialog(
+            viewModel = syncplayViewModel,
+            onDismiss = { showJoinRoomDialog = false },
+        )
+    }
 }
 
 @Composable
