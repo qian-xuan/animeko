@@ -9,11 +9,23 @@
 
 package me.him188.ani.app.domain.player.extension
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import me.him188.ani.app.domain.episode.EpisodeSession
+import me.him188.ani.app.domain.episode.UnsafeEpisodeSessionApi
+import me.him188.ani.syncplay.engine.BridgeAntiLoop
+import me.him188.ani.syncplay.engine.Playback
+import me.him188.ani.syncplay.engine.ProtocolManager
+import me.him188.ani.syncplay.engine.RoomCallback
 import me.him188.ani.syncplay.engine.SyncplayController
+import me.him188.ani.syncplay.engine.parseIdentityInFilename
+import me.him188.ani.syncplay.engine.shouldSwitchEpisode
 import me.him188.ani.utils.logging.info
 import me.him188.ani.utils.logging.logger
 import org.koin.core.Koin
+import org.openani.mediamp.isPlaying
+import kotlin.math.abs
+import kotlin.time.Clock
 
 /**
  * Syncplay player extension. Bridges the animeko player with the [SyncplayController].
@@ -22,25 +34,104 @@ import org.koin.core.Koin
  * once per [EpisodeSession] (per-episode); the old session's [ExtensionBackgroundTaskScope]
  * is cancelled on switch.
  *
- * T4.2: Skeleton only — logs start, marks awaiting-room-resync on episode switch.
- * T4.3 will fill in the full bidirectional bridge (player state -> outbound State packets,
- * inbound Set.file -> switchEpisode, player playback -> controller.isPlayingFlow) and
- * anti-loop logic.
+ * The bridge is bidirectional:
+ * - **Outbound**: player playback state and position are collected and sent to the server
+ *   via [me.him188.ani.syncplay.engine.RoomEventDispatcher.controlPlayback] and
+ *   [me.him188.ani.syncplay.engine.RoomEventDispatcher.sendSeek]. The player's play state
+ *   also feeds [SyncplayController.isPlayingFlow] for the health monitor's
+ *   playback-broadcast coroutine.
+ * - **Inbound**: the extension installs itself as the controller's
+ *   [SyncplayController.playerBridge] ([RoomCallback]) so inbound pause/play/seek events
+ *   drive the player, and collects [SyncplayController.inboundFileFlow] to auto-switch
+ *   episodes when a peer loads a file with a matching identity-in-filename.
+ *
+ * Anti-loop logic ([BridgeAntiLoop]) prevents feedback loops: sync-driven player calls
+ * arm suppression flags so the resulting player-state emissions are not re-broadcast.
  */
 class SyncplayPlayerExtension private constructor(
+    private val context: PlayerExtensionContext,
     private val controller: SyncplayController,
-) : PlayerExtension("SyncplayPlayerExtension") {
+) : PlayerExtension("SyncplayPlayerExtension"), RoomCallback {
 
+    private val antiLoop = BridgeAntiLoop()
+
+    @OptIn(UnsafeEpisodeSessionApi::class)
     override fun onStart(
         episodeSession: EpisodeSession,
         backgroundTaskScope: ExtensionBackgroundTaskScope,
     ) {
         logger.info { "SyncplayPlayerExtension started for episode ${episodeSession.episodeId}" }
-        // T4.3: Launch bridge coroutines here using episodeSession directly.
-        // The bridge will:
-        // 1. Collect player.playbackState + currentPositionMillis -> outbound State
-        // 2. Collect controller's inbound Set.file -> switchEpisode
-        // 3. Feed player.playbackState -> controller.isPlayingFlow
+
+        // Install this extension as the controller's player-driving callback so inbound
+        // room events (pause/play/seek) reach the player.
+        controller.playerBridge = this
+
+        val player = context.player
+
+        // 1. Outbound: player playbackState -> controller.isPlayingFlow + controlPlayback.
+        //    Feeds isPlayingFlow UNCONDITIONALLY (not gated by enableSync) so the health
+        //    monitor sees the real player state. On a pause/play transition, sends a
+        //    State packet unless the change was sync-driven (anti-loop suppresses it),
+        //    AND only when the controller is actually connected to a server.
+        backgroundTaskScope.launch("PlaybackStateBridge") {
+            var wasPlaying = player.playbackState.value.isPlaying
+            player.playbackState.collect { state ->
+                val isPlaying = state.isPlaying
+                controller.isPlayingFlow.value = isPlaying
+
+                if (isPlaying != wasPlaying) {
+                    if (!antiLoop.shouldSuppressPlaybackOutbound()
+                        && controller.state.value == me.him188.ani.syncplay.protocol.models.ConnectionState.CONNECTED
+                    ) {
+                        val playback = if (isPlaying) Playback.PLAY else Playback.PAUSE
+                        controller.dispatcher.controlPlayback(playback)
+                    }
+                    wasPlaying = isPlaying
+                }
+            }
+        }
+
+        // 2. Outbound: player position -> seek detection -> sendSeek.
+        //    A position jump larger than [ProtocolManager.SEEK_THRESHOLD] (after the player
+        //    has started) is treated as a user-initiated seek and broadcast to the room.
+        //    Sync-driven seeks are suppressed via the seek-suppression window.
+        //    Only active when connected to a server.
+        backgroundTaskScope.launch("PositionBridge") {
+            var lastPosMs = 0L
+            player.currentPositionMillis.collect { pos ->
+                val nowMs = Clock.System.now().toEpochMilliseconds()
+                if (antiLoop.shouldSuppressPositionOutbound(pos, nowMs)) {
+                    lastPosMs = pos
+                    return@collect
+                }
+                if (controller.state.value != me.him188.ani.syncplay.protocol.models.ConnectionState.CONNECTED) {
+                    lastPosMs = pos
+                    return@collect
+                }
+                val delta = abs(pos - lastPosMs)
+                if (lastPosMs > 0 && delta > ProtocolManager.SEEK_THRESHOLD * 1000L) {
+                    controller.dispatcher.sendSeek(pos)
+                }
+                lastPosMs = pos
+            }
+        }
+
+        // 3. Inbound: Set.file -> switchEpisode with anti-loop.
+        //    Parses identity-in-filename (`subjectId[episodeId]`) from a peer's Set.file
+        //    and switches to the matching episode. Arms enableFileSync so the resulting
+        //    media-load emission does not echo back as an outbound Set.file announce.
+        backgroundTaskScope.launch("InboundFileBridge") {
+            controller.inboundFileFlow.collect { file ->
+                val filename = file?.name ?: return@collect
+                val parsed = parseIdentityInFilename(filename) ?: return@collect
+                val (_, episodeId) = parsed
+                val currentEpisodeId = context.getCurrentEpisodeId()
+                if (shouldSwitchEpisode(episodeId, currentEpisodeId)) {
+                    antiLoop.armForFileSwitch()
+                    context.switchEpisode(episodeId)
+                }
+            }
+        }
     }
 
     override suspend fun onBeforeSwitchEpisode(newEpisodeId: Int) {
@@ -48,13 +139,41 @@ class SyncplayPlayerExtension private constructor(
     }
 
     override suspend fun onClose() {
-        // T4.3: Cancel any bridge coroutines.
-        // For now, the backgroundTaskScope handles cancellation.
+        // Detach the player-driving callback. The backgroundTaskScope is cancelled
+        // automatically by the framework, which tears down the bridge coroutines.
+        controller.playerBridge = null
+    }
+
+    // -- RoomCallback: inbound player-driving callbacks --
+    // Each arms the anti-loop BEFORE the player call so the resulting playbackState /
+    // currentPositionMillis emission is suppressed from outbound broadcast.
+
+    override suspend fun onSomeonePaused(setBy: String) {
+        antiLoop.armForPlaybackChange()
+        withContext(Dispatchers.Main.immediate) {
+            context.player.pause()
+        }
+    }
+
+    override suspend fun onSomeonePlayed(setBy: String) {
+        antiLoop.armForPlaybackChange()
+        withContext(Dispatchers.Main.immediate) {
+            context.player.resume()
+        }
+    }
+
+    override suspend fun onSomeoneSeeked(setBy: String, positionSec: Double) {
+        val targetMs = (positionSec * 1000).toLong()
+        val nowMs = Clock.System.now().toEpochMilliseconds()
+        antiLoop.armForSeek(targetMs, nowMs)
+        withContext(Dispatchers.Main.immediate) {
+            context.player.seekTo(targetMs)
+        }
     }
 
     companion object : EpisodePlayerExtensionFactory<SyncplayPlayerExtension> {
         override fun create(context: PlayerExtensionContext, koin: Koin): SyncplayPlayerExtension {
-            return SyncplayPlayerExtension(koin.get<SyncplayController>())
+            return SyncplayPlayerExtension(context, koin.get<SyncplayController>())
         }
 
         private val logger = logger<SyncplayPlayerExtension>()

@@ -13,6 +13,8 @@ import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -47,6 +49,14 @@ class KtorSyncplayNetworkManager(
     private var readChannel: ByteReadChannel? = null
     private var writeChannel: ByteWriteChannel? = null
     private var readerJob: Job? = null
+
+    /**
+     * Serializes writes to [writeChannel]. Multiple [sendAsync] calls (bridge controlPlayback,
+     * health-monitor playback-broadcast, ACK loop) can race on the same [ByteWriteChannel],
+     * corrupting its internal buffer and causing [NullPointerException] inside
+     * `writeStringUtf8`. This mutex ensures only one write at a time.
+     */
+    private val writeMutex = Mutex()
 
     override suspend fun connectSocket() {
         withContext(Dispatchers.IO) {
@@ -102,7 +112,9 @@ class KtorSyncplayNetworkManager(
 
     override suspend fun writeActualString(s: String) {
         try {
-            writeChannel?.writeStringUtf8(s)
+            writeMutex.withLock {
+                writeChannel?.writeStringUtf8(s)
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
