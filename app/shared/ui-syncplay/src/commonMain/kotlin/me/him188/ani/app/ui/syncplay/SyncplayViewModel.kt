@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import me.him188.ani.app.ui.foundation.AbstractViewModel
 import me.him188.ani.app.ui.foundation.launchInBackground
+import me.him188.ani.utils.logging.info
+import me.him188.ani.utils.logging.logger
 import me.him188.ani.syncplay.engine.ChatMessage
 import me.him188.ani.syncplay.engine.SyncplayController
 import me.him188.ani.syncplay.protocol.models.ConnectionState
@@ -34,6 +36,10 @@ import me.him188.ani.syncplay.protocol.models.User
 class SyncplayViewModel(
     private val controller: SyncplayController,
 ) : AbstractViewModel() {
+
+    companion object {
+        private val logger = logger<SyncplayViewModel>()
+    }
 
     data class SyncplayUiState(
         val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
@@ -70,6 +76,7 @@ class SyncplayViewModel(
         password: String,
         enableTLS: Boolean,
     ) {
+        logger.info { "Joining room '$room' at $host:$port as '$username'" }
         roomFlow.value = room
         launchInBackground {
             controller.connect(host, port, room, username, password, enableTLS)
@@ -77,6 +84,7 @@ class SyncplayViewModel(
     }
 
     fun disconnect() {
+        logger.info { "Leaving room" }
         controller.disconnect()
     }
 
