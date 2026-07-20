@@ -13,6 +13,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerializationException
+import me.him188.ani.utils.logging.debug
+import me.him188.ani.utils.logging.info
+import me.him188.ani.utils.logging.logger
+import me.him188.ani.utils.logging.trace
+import me.him188.ani.utils.logging.warn
 import me.him188.ani.syncplay.protocol.WireMessage
 import me.him188.ani.syncplay.protocol.WireMessageDeserializer
 import me.him188.ani.syncplay.protocol.WireMessageHandler
@@ -103,9 +108,6 @@ abstract class SyncplayNetworkManager(
     /** Drops the stale sync anchor so the first State on a new socket re-anchors. No-op default. */
     var resetSyncAnchorForReconnect: () -> Unit = {}
 
-    /** Subclasses override to add logging. No-op default. */
-    protected open fun log(message: String) {}
-
     // -- Concrete methods --
 
     /**
@@ -113,6 +115,7 @@ abstract class SyncplayNetworkManager(
      * otherwise calls [onReadyForHandshake] (which sends Hello).
      */
     open suspend fun connect() {
+        logger.info { "Connecting to $host:$port (tls=$tls)" }
         terminateExistingConnection()
         state.value = ConnectionState.CONNECTING
         try {
@@ -125,7 +128,7 @@ abstract class SyncplayNetworkManager(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log(e.stackTraceToString())
+            logger.warn(e) { "Connection failed to $host:$port" }
             onConnectionFailed()
         }
     }
@@ -143,6 +146,7 @@ abstract class SyncplayNetworkManager(
      */
     fun reconnect() {
         if (reconnectionJob?.isActive == true) return
+        logger.info { "Scheduling reconnect to $host:$port (interval=${reconnectInterval.inWholeMilliseconds}ms)" }
         reconnectionJob = coroutineScope.launch(Dispatchers.IO) {
             resetSyncAnchorForReconnect.invoke()
             while (isActive && state.value != ConnectionState.CONNECTED) {
@@ -154,6 +158,7 @@ abstract class SyncplayNetworkManager(
                 // in its pipeline — resetting to TLS_ASK makes the reconnect re-do the same
                 // negotiation the initial connect did.
                 if (tls == TlsState.TLS_YES) tls = TlsState.TLS_ASK
+                logger.debug { "Reconnect attempt: state=${state.value}" }
                 connect()
             }
         }
@@ -189,13 +194,12 @@ abstract class SyncplayNetworkManager(
      * bug should be visible, not silently swallowed.
      */
     private suspend fun processPacket(jsonString: String) {
-        log("**SERVER** $jsonString")
+        logger.trace { "SERVER>>> $jsonString" }
         try {
             val message = syncplayJson.decodeFromString(WireMessageDeserializer, jsonString)
             message.dispatch(handler)
         } catch (e: SerializationException) {
-            log("Skipping unparseable server message: $jsonString")
-            log("Reason: ${e.message}")
+            logger.warn(e) { "Skipping unparseable server message: $jsonString" }
         } catch (e: CancellationException) {
             throw e
         }
@@ -233,13 +237,13 @@ abstract class SyncplayNetworkManager(
             try {
                 withTimeout(10.seconds) {
                     val finalOut = json + "\r\n"
-                    log("Client>>> $finalOut")
+                    logger.trace { "CLIENT>>> $finalOut" }
                     writeActualString(finalOut)
                 }
             } catch (e: Exception) {
-                log(e.stackTraceToString())
+                logger.warn(e) { "Write failed for: $json" }
                 if (retryCounter >= 3) {
-                    log("SOCKET INVALID")
+                    logger.warn { "Socket invalid after 3 retries, marking disconnected" }
                     if (queueable) {
                         queueOutbound.invoke(json)
                     }
@@ -253,10 +257,15 @@ abstract class SyncplayNetworkManager(
 
     /** Tears down the connection and resets state. */
     open fun invalidate() {
+        logger.info { "Invalidating connection to $host:$port" }
         reconnectionJob?.cancel()
         terminateExistingConnection()
         inboundLines.close()
         state.value = ConnectionState.DISCONNECTED
         tls = TlsState.TLS_NO
+    }
+
+    companion object {
+        private val logger = logger<SyncplayNetworkManager>()
     }
 }

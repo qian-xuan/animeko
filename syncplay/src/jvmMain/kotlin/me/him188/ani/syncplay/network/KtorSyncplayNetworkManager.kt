@@ -21,6 +21,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.him188.ani.syncplay.protocol.models.ConnectionState
 import me.him188.ani.syncplay.protocol.models.TlsState
+import me.him188.ani.utils.logging.debug
+import me.him188.ani.utils.logging.info
+import me.him188.ani.utils.logging.logger
+import me.him188.ani.utils.logging.warn
 import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -73,7 +77,7 @@ class KtorSyncplayNetworkManager(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log(e.stackTraceToString())
+                logger.warn(e) { "TCP connect failed: $host:$port" }
                 onConnectionFailed()
             }
         }
@@ -91,10 +95,12 @@ class KtorSyncplayNetworkManager(
                     val line = channel.readUTF8Line() ?: break
                     handlePacket(line)
                 }
+                logger.info { "Socket EOF, marking disconnected" }
                 onDisconnected()
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logger.warn(e) { "Reader coroutine failed" }
                 onDisconnected()
             }
         }
@@ -103,6 +109,7 @@ class KtorSyncplayNetworkManager(
     override fun supportsTLS(): Boolean = true
 
     override fun terminateExistingConnection() {
+        logger.debug { "Terminating existing connection" }
         runCatching { socket?.close() }
         socket = null
         readChannel = null
@@ -118,7 +125,7 @@ class KtorSyncplayNetworkManager(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log(e.stackTraceToString())
+            logger.warn(e) { "Write failed on socket" }
             onDisconnected()
         }
     }
@@ -137,10 +144,11 @@ class KtorSyncplayNetworkManager(
             writeChannel = tlsSocket.openWriteChannel(autoFlush = true)
             launchReader()
             tls = TlsState.TLS_YES
+            logger.info { "TLS established with $host" }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log("TLS upgrade failed, staying on plaintext: ${e.stackTraceToString()}")
+            logger.warn(e) { "TLS upgrade failed, falling back to plaintext" }
             socket = currentSocket
             readChannel = oldReadChannel
             writeChannel = oldWriteChannel
@@ -160,7 +168,7 @@ class KtorSyncplayNetworkManager(
         reconnect()
     }
 
-    override fun log(message: String) {
-        println(message)
+    companion object {
+        private val logger = logger<KtorSyncplayNetworkManager>()
     }
 }
