@@ -57,7 +57,7 @@ jna = "5.13.0" # 不要轻易改这个版本, 它可能导致 VLC 兼容性问�
 dbus-java = "5.2.0"
 jsonpathkt-kotlinx = "3.0.2"
 ksoup = "0.2.2"
-filekit = "0.10.0-beta04" # https://github.com/vinceglb/FileKit/releases
+filekit = "0.13.0" # https://github.com/vinceglb/FileKit/releases
 kotlinpoet = "1.18.1" # https://github.com/square/kotlinpoet/releases
 log4j-core = "2.20.0"
 ktor = "3.1.1" # https://github.com/ktorio/ktor/releases
@@ -88,6 +88,7 @@ posthog-android = "3.11.3"
 posthog-java = "1.2.0"
 openapi-generator = "7.13.0"
 mediamp = "0.1.16"
+libass-android = "0.5.0-beta01"
 compose-native-tray = "1.3.0"
 kmpalette = "4.0.0-beta02"
 haze = "1.7.2"
@@ -166,6 +167,7 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 ktor-network-tls = { module = "io.ktor:ktor-network-tls", version.ref = "ktor" }
@@ -279,6 +281,7 @@ mediamp-exoplayer = { module = "org.openani.mediamp:mediamp-exoplayer", version.
 mediamp-ffmpeg = { module = "org.openani.mediamp:mediamp-ffmpeg", version.ref = "mediamp" }
 mediamp-ffmpeg-desktop = { module = "org.openani.mediamp:mediamp-ffmpeg-desktop", version.ref = "mediamp" }
 mediamp-ffmpeg-runtime-windows-x64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-windows-x64", version.ref = "mediamp" }
+mediamp-ffmpeg-runtime-windows-arm64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-windows-arm64", version.ref = "mediamp" }
 mediamp-ffmpeg-runtime-linux-x64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-linux-x64", version.ref = "mediamp" }
 mediamp-ffmpeg-runtime-macos-x64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-macos-x64", version.ref = "mediamp" }
 mediamp-ffmpeg-runtime-macos-arm64 = { module = "org.openani.mediamp:mediamp-ffmpeg-runtime-macos-arm64", version.ref = "mediamp" }
@@ -292,6 +295,7 @@ mediamp-mpv-runtime-macos-arm64 = { module = "org.openani.mediamp:mediamp-mpv-ru
 mediamp-source-ktxio = { module = "org.openani.mediamp:mediamp-source-ktxio", version.ref = "mediamp" }
 mediamp-test = { module = "org.openani.mediamp:mediamp-test", version.ref = "mediamp" }
 mediamp-vlc = { module = "org.openani.mediamp:mediamp-vlc", version.ref = "mediamp" }
+libass-media = { module = "io.github.peerless2012:ass-media", version.ref = "libass-android" }
 
 ### All other libraries ###
 

@@ -681,10 +681,11 @@
     <string name="video_player_speed">Speed</string>
     <string name="video_player_skip_op_ed">Skipping OP or ED soon</string>
     <string name="video_player_cancel">Cancel</string>
+    <string name="video_player_release_to_cancel">Release to cancel</string>
     <string name="video_player_stats_title">Playback Info</string>
     <string name="video_player_stats_title_show">Show Playback Info</string>
     <string name="video_player_stats_title_hide">Hide Playback Info</string>
-    <string name="video_player_stats_hide_hint">Tab to hide</string>
+    <string name="video_player_stats_hide_hint">I to hide</string>
     <string name="video_player_stats_backend">Backend</string>
     <string name="video_player_stats_state">State</string>
     <string name="video_player_stats_media_title">Title</string>
@@ -802,6 +803,9 @@
     <string name="cache_management_exit_selection">Exit Selection</string>
     <string name="cache_management_select_all">Select All</string>
     <string name="cache_management_delete_selected">Delete Selected</string>
+    <string name="cache_management_resume_selected">Resume</string>
+    <string name="cache_management_pause_selected">Pause</string>
+    <string name="cache_management_selection_summary">%1$d selected · %2$s in total</string>
     <string name="cache_management_enter_selection_mode">Enter Selection Mode</string>
     <string name="cache_management_delete_cache_title">Delete Cache</string>
     <string name="cache_management_delete_cache_confirmation">Deletion cannot be undone. Delete this cache?</string>
