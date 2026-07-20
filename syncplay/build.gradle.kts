@@ -24,6 +24,7 @@ kotlin {
         implementation(libs.kotlinx.coroutines.core)
         implementation(libs.atomicfu)
         implementation(libs.ktor.network)
+        implementation(projects.utils.logging)
     }
     sourceSets.getByName("jvmMain").dependencies {
         implementation(libs.ktor.network.tls)
