@@ -8,6 +8,8 @@ import me.him188.ani.syncplay.protocol.wire.IgnoringOnTheFlyData
 import me.him188.ani.syncplay.protocol.wire.PingData
 import me.him188.ani.syncplay.protocol.wire.PlaystateData
 import me.him188.ani.syncplay.protocol.wire.StateData
+import me.him188.ani.utils.logging.debug
+import me.him188.ani.utils.logging.logger
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -160,6 +162,7 @@ class ProtocolManager {
         )
 
         if (isLocalStateChange) {
+            logger.debug { "Outbound State: doSeek=$doSeek, pos=$position, play=$play, clientIgnFly=${clientIgnFly + 1}" }
             _clientIgnFly.incrementAndGet()
         }
 
@@ -170,7 +173,10 @@ class ProtocolManager {
                 server = snapshotServer.takeIf { it != 0 },
                 client = snapshotClient.takeIf { it != 0 }
             )
-            if (snapshotServer != 0) _serverIgnFly.compareAndSet(snapshotServer, 0)
+            if (snapshotServer != 0) {
+                logger.debug { "serverIgnFly reset: $snapshotServer to 0 (in ACK)" }
+                _serverIgnFly.compareAndSet(snapshotServer, 0)
+            }
             ign
         } else null
 
@@ -180,6 +186,8 @@ class ProtocolManager {
     }
 
     companion object {
+        private val logger = logger<ProtocolManager>()
+
         /** Syncplay protocol version advertised in `Hello.realversion`. */
         const val SYNCPLAY_PROTOCOL_VERSION = "1.7.5"
 

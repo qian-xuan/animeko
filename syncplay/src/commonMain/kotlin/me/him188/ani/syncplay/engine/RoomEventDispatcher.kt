@@ -5,6 +5,8 @@ import me.him188.ani.syncplay.protocol.WireMessage
 import me.him188.ani.syncplay.protocol.models.RoomFeatures
 import me.him188.ani.syncplay.protocol.wire.HelloData
 import me.him188.ani.syncplay.protocol.wire.Room
+import me.him188.ani.utils.logging.debug
+import me.him188.ani.utils.logging.logger
 
 /**
  * Handles outbound protocol messages for playback control, seeking, and chat.
@@ -27,6 +29,10 @@ class RoomEventDispatcher(
 ) {
     private val network get() = networkManager
 
+    companion object {
+        private val logger = logger<RoomEventDispatcher>()
+    }
+
     /**
      * Sends the Hello handshake message.
      *
@@ -37,6 +43,9 @@ class RoomEventDispatcher(
      * whose companion may carry a different value).
      */
     suspend fun sendHello() {
+        logger.debug {
+            "Sending Hello: room='${session.currentRoom}', user='${session.currentUsername}', version=${ProtocolManager.SYNCPLAY_LEGACY_VERSION}, realversion=${ProtocolManager.SYNCPLAY_PROTOCOL_VERSION}"
+        }
         val passwordHash = session.currentPassword.takeIf { it.isNotEmpty() }?.let { md5Hex(it) }
         network.send(
             WireMessage.Hello(
@@ -66,6 +75,7 @@ class RoomEventDispatcher(
     suspend fun sendSeek(newPosMs: Long) {
         val positionSec = newPosMs / 1000.0
         val play = protocol.expectedPlaying
+        logger.debug { "Sending seek to ${newPosMs}ms (play=$play)" }
         network.send(
             protocol.buildStatePacket(
                 serverTime = null,
@@ -83,6 +93,7 @@ class RoomEventDispatcher(
      * Ported from syncplay-mobile RoomEventDispatcher.sendMessage() (lines 98-101).
      */
     suspend fun sendMessage(message: String) {
+        logger.debug { "Sending chat: $message" }
         network.send(WireMessage.chatRequest(message))
     }
 
@@ -106,6 +117,7 @@ class RoomEventDispatcher(
      */
     suspend fun controlPlayback(playback: Playback, tellServer: Boolean = true) {
         val paused = playback == Playback.PAUSE
+        logger.debug { "Control playback: $playback (tellServer=$tellServer)" }
         protocol.noteExpectedPlaybackState(paused = paused)
         if (tellServer) {
             network.send(

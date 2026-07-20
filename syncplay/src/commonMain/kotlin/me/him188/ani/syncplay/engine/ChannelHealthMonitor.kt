@@ -12,6 +12,11 @@ import kotlinx.coroutines.launch
 import me.him188.ani.syncplay.network.SyncplayNetworkManager
 import me.him188.ani.syncplay.protocol.WireMessage
 import me.him188.ani.syncplay.protocol.models.ConnectionState
+import me.him188.ani.utils.logging.debug
+import me.him188.ani.utils.logging.info
+import me.him188.ani.utils.logging.logger
+import me.him188.ani.utils.logging.trace
+import me.him188.ani.utils.logging.warn
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
@@ -52,6 +57,10 @@ class ChannelHealthMonitor(
     private var watchdogJob: Job? = null
     private var playbackBroadcastJob: Job? = null
 
+    companion object {
+        private val logger = logger<ChannelHealthMonitor>()
+    }
+
     /**
      * Starts the 3 coroutines. Called when the connection becomes CONNECTED.
      * Idempotent — stops existing jobs before starting new ones.
@@ -61,6 +70,9 @@ class ChannelHealthMonitor(
      */
     fun start() {
         stop()
+        logger.info {
+            "Channel health monitor started (probe=${ProtocolManager.LIST_PROBE_INTERVAL_SECONDS}s, watchdog=${ProtocolManager.WATCHDOG_INTERVAL_SECONDS}s, timeout=${ProtocolManager.STATE_TIMEOUT_SECONDS}s)"
+        }
         protocol.lastStateReceivedAt = Clock.System.now()
 
         // 1. List-probe: send List request every 15s to keep the channel warm.
@@ -69,6 +81,7 @@ class ChannelHealthMonitor(
                 delay(ProtocolManager.LIST_PROBE_INTERVAL_SECONDS.seconds)
                 if (networkManager.state.value == ConnectionState.CONNECTED) {
                     networkManager.sendAsync(WireMessage.listRequest())
+                    logger.trace { "List probe sent" }
                 }
             }
         }
@@ -81,6 +94,7 @@ class ChannelHealthMonitor(
                 if (lastState != null && networkManager.state.value == ConnectionState.CONNECTED) {
                     val elapsed = (Clock.System.now() - lastState).inWholeSeconds
                     if (elapsed >= ProtocolManager.STATE_TIMEOUT_SECONDS) {
+                        logger.warn { "Watchdog: no State for ${elapsed}s, marking disconnected" }
                         // Silent disconnect — server stopped sending State.
                         // Drop the stale socket before firing the callback so the
                         // reconnect logic doesn't try to reuse a dead connection.
@@ -101,6 +115,7 @@ class ChannelHealthMonitor(
                 if (expectedPaused != actualPaused &&
                     networkManager.state.value == ConnectionState.CONNECTED
                 ) {
+                    logger.debug { "Playback divergence: expectedPaused=$expectedPaused, actualPaused=$actualPaused, broadcasting corrective State" }
                     // Divergence: the player's actual state doesn't match what we told the room.
                     // Update expectation BEFORE sending so the next emission doesn't re-fire.
                     protocol.noteExpectedPlaybackState(paused = actualPaused)
@@ -128,5 +143,6 @@ class ChannelHealthMonitor(
         listProbeJob = null
         watchdogJob = null
         playbackBroadcastJob = null
+        logger.info { "Channel health monitor stopped" }
     }
 }
