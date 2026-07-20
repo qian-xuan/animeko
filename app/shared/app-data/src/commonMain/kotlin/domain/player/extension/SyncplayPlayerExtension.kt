@@ -20,6 +20,7 @@ import me.him188.ani.syncplay.engine.RoomCallback
 import me.him188.ani.syncplay.engine.SyncplayController
 import me.him188.ani.syncplay.engine.parseIdentityInFilename
 import me.him188.ani.syncplay.engine.shouldSwitchEpisode
+import me.him188.ani.utils.logging.debug
 import me.him188.ani.utils.logging.info
 import me.him188.ani.utils.logging.logger
 import org.koin.core.Koin
@@ -76,6 +77,7 @@ class SyncplayPlayerExtension private constructor(
         //    Also updates controller.playerPositionMs and controller.mediaLoaded so the
         //    engine's decideAction can use the real local position and media state.
         backgroundTaskScope.launch("PlaybackStateBridge") {
+            logger.debug { "PlaybackStateBridge started" }
             var wasPlaying = player.playbackState.value.isPlaying
             player.playbackState.collect { state ->
                 val isPlaying = state.isPlaying
@@ -83,11 +85,15 @@ class SyncplayPlayerExtension private constructor(
                 controller.mediaLoaded = true
 
                 if (isPlaying != wasPlaying) {
+                    logger.debug { "Playback transition: isPlaying=$isPlaying, wasPlaying=$wasPlaying" }
                     if (!antiLoop.shouldSuppressPlaybackOutbound()
                         && controller.state.value == me.him188.ani.syncplay.protocol.models.ConnectionState.CONNECTED
                     ) {
                         val playback = if (isPlaying) Playback.PLAY else Playback.PAUSE
                         controller.dispatcher.controlPlayback(playback)
+                        logger.debug { "Sent controlPlayback($playback)" }
+                    } else if (antiLoop.shouldSuppressPlaybackOutbound()) {
+                        logger.debug { "Suppressed outbound controlPlayback (enableSync=true)" }
                     }
                     wasPlaying = isPlaying
                 }
@@ -102,12 +108,14 @@ class SyncplayPlayerExtension private constructor(
         //    Also updates controller.playerPositionMs so the engine's decideAction can
         //    compute the real diff between local and global position.
         backgroundTaskScope.launch("PositionBridge") {
+            logger.debug { "PositionBridge started" }
             var lastPosMs = 0L
             var wasSuppressing = false
             player.currentPositionMillis.collect { pos ->
                 controller.playerPositionMs = pos
                 val nowMs = Clock.System.now().toEpochMilliseconds()
                 if (antiLoop.shouldSuppressPositionOutbound(pos, nowMs)) {
+                    logger.debug { "Suppressed outbound seek (enableSync=true)" }
                     lastPosMs = pos
                     wasSuppressing = true
                     return@collect
@@ -126,6 +134,7 @@ class SyncplayPlayerExtension private constructor(
                 }
                 val delta = abs(pos - lastPosMs)
                 if (lastPosMs > 0 && delta > ProtocolManager.SEEK_THRESHOLD * 1000L) {
+                    logger.debug { "Seek detected: delta=${delta}ms, lastPos=$lastPosMs, pos=$pos" }
                     controller.dispatcher.sendSeek(pos)
                 }
                 lastPosMs = pos
@@ -137,12 +146,18 @@ class SyncplayPlayerExtension private constructor(
         //    and switches to the matching episode. Arms enableFileSync so the resulting
         //    media-load emission does not echo back as an outbound Set.file announce.
         backgroundTaskScope.launch("InboundFileBridge") {
+            logger.debug { "InboundFileBridge started" }
             controller.inboundFileFlow.collect { file ->
                 val filename = file?.name ?: return@collect
-                val parsed = parseIdentityInFilename(filename) ?: return@collect
-                val (_, episodeId) = parsed
+                val parsed = parseIdentityInFilename(filename) ?: run {
+                    logger.debug { "File identity not parsed from '$filename' (ignored)" }
+                    return@collect
+                }
+                val (subjectId, episodeId) = parsed
+                logger.debug { "File identity: subjectId=$subjectId, episodeId=$episodeId (from '$filename')" }
                 val currentEpisodeId = context.getCurrentEpisodeId()
                 if (shouldSwitchEpisode(episodeId, currentEpisodeId)) {
+                    logger.info { "Switching episode: $currentEpisodeId to $episodeId (triggered by peer)" }
                     antiLoop.armForFileSwitch()
                     context.switchEpisode(episodeId)
                 }
@@ -155,6 +170,7 @@ class SyncplayPlayerExtension private constructor(
     }
 
     override suspend fun onClose() {
+        logger.info { "Closed, detaching player bridge" }
         // Detach the player-driving callback. The backgroundTaskScope is cancelled
         // automatically by the framework, which tears down the bridge coroutines.
         controller.playerBridge = null
@@ -165,6 +181,7 @@ class SyncplayPlayerExtension private constructor(
     // currentPositionMillis emission is suppressed from outbound broadcast.
 
     override suspend fun onSomeonePaused(setBy: String) {
+        logger.debug { "Applying inbound pause from '$setBy'" }
         antiLoop.armForPlaybackChange()
         withContext(Dispatchers.Main.immediate) {
             context.player.pause()
@@ -172,6 +189,7 @@ class SyncplayPlayerExtension private constructor(
     }
 
     override suspend fun onSomeonePlayed(setBy: String) {
+        logger.debug { "Applying inbound play from '$setBy'" }
         antiLoop.armForPlaybackChange()
         withContext(Dispatchers.Main.immediate) {
             context.player.resume()
@@ -180,6 +198,7 @@ class SyncplayPlayerExtension private constructor(
 
     override suspend fun onSomeoneSeeked(setBy: String, positionSec: Double) {
         val targetMs = (positionSec * 1000).toLong()
+        logger.debug { "Applying inbound seek to ${targetMs}ms from '$setBy'" }
         val nowMs = Clock.System.now().toEpochMilliseconds()
         antiLoop.armForSeek(targetMs, nowMs)
         withContext(Dispatchers.Main.immediate) {
