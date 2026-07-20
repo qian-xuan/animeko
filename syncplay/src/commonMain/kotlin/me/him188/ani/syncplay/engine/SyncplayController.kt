@@ -10,6 +10,8 @@ import me.him188.ani.syncplay.protocol.models.ConnectionState
 import me.him188.ani.syncplay.protocol.models.TlsState
 import me.him188.ani.syncplay.protocol.models.User
 import me.him188.ani.syncplay.protocol.wire.FileData
+import me.him188.ani.utils.logging.info
+import me.him188.ani.utils.logging.logger
 
 /**
  * Owns the full Syncplay client stack: a [SyncplayNetworkManager] transport, a [Session]
@@ -142,6 +144,7 @@ class SyncplayController(
         password: String,
         enableTLS: Boolean,
     ) {
+        logger.info { "Connecting to room '$room' at $host:$port as '$username' (tls=$enableTLS)" }
         session.serverHost = host
         session.serverPort = port
         session.currentRoom = room
@@ -157,6 +160,7 @@ class SyncplayController(
      * Tears down the connection, stops the health monitor, and resets state.
      */
     fun disconnect() {
+        logger.info { "Disconnecting from ${session.serverHost}:${session.serverPort}" }
         healthMonitor.stop()
         networkManager.invalidate()
     }
@@ -173,10 +177,12 @@ class SyncplayController(
     // -- RoomCallback: connection lifecycle --
 
     override suspend fun onConnected() {
+        logger.info { "Connected to room '${session.currentRoom}'" }
         healthMonitor.start()
     }
 
     override suspend fun onDisconnected() {
+        logger.info { "Disconnected from room '${session.currentRoom}'" }
         healthMonitor.stop()
     }
 
@@ -200,5 +206,9 @@ class SyncplayController(
 
     override suspend fun onSomeoneFastForwarded(setBy: String, positionSec: Double) {
         playerBridge?.onSomeoneFastForwarded(setBy, positionSec)
+    }
+
+    companion object {
+        private val logger = logger<SyncplayController>()
     }
 }

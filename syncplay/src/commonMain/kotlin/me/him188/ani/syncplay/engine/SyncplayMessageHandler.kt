@@ -8,6 +8,10 @@ import me.him188.ani.syncplay.protocol.models.MediaFile
 import me.him188.ani.syncplay.protocol.models.User
 import me.him188.ani.syncplay.protocol.wire.ListUserData
 import me.him188.ani.syncplay.protocol.wire.UserSetData
+import me.him188.ani.utils.logging.debug
+import me.him188.ani.utils.logging.info
+import me.him188.ani.utils.logging.logger
+import me.him188.ani.utils.logging.warn
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
@@ -36,8 +40,13 @@ class SyncplayMessageHandler(
     private val networkManager: SyncplayNetworkManager,
 ) : WireMessageHandler {
 
+    companion object {
+        private val logger = logger<SyncplayMessageHandler>()
+    }
+
     override suspend fun onHello(message: WireMessage.Hello) {
         val data = message.data
+        logger.info { "Hello received: motd=${data.motd?.take(50)}, features=${data.features}" }
         data.username?.let { session.currentUsername = it }
         session.roomFeatures = data.features
 
@@ -72,6 +81,7 @@ class SyncplayMessageHandler(
         val sender = message.data.username ?: return
         val text = message.data.message ?: return
 
+        logger.debug { "Chat from '$sender': $text" }
         callback.onChatReceived(sender, text)
         session.messageSequence.update { it + ChatMessage(username = sender, message = text) }
     }
@@ -87,6 +97,7 @@ class SyncplayMessageHandler(
 
     override suspend fun onError(message: WireMessage.Error) {
         val errorText = message.data.message ?: return
+        logger.warn { "Server error: $errorText" }
         session.messageSequence.update {
             it + ChatMessage(username = "", message = errorText, isSystemMessage = true)
         }
@@ -115,7 +126,10 @@ class SyncplayMessageHandler(
         protocol.clientIgnFly = ignFlyResult.newClientIgnFly
         protocol.serverIgnFly = ignFlyResult.newServerIgnFly
 
-        if (ignFlyResult.result == IgnFlyResult.Skip) return
+        if (ignFlyResult.result == IgnFlyResult.Skip) {
+            logger.debug { "State skipped by ignFly (client=${protocol.clientIgnFly}, server=${protocol.serverIgnFly})" }
+            return
+        }
 
         var position: Double? = null
         var paused: Boolean? = null
@@ -169,9 +183,18 @@ class SyncplayMessageHandler(
                 now = now,
             )
 
-            applyActions(actions, setBy)
+            logger.debug { "Sync decision: actions=$actions, setBy=$setBy, messageAge=$messageAge" }
 
             val agedPosition = if (isPaused) pos else pos + messageAge
+            if (doSeek == true) {
+                logger.debug { "Seek command from '$setBy': seeking to ${agedPosition}s" }
+            }
+            if (actions.any { it is SyncAction.FirstSync }) {
+                logger.info { "First sync: seeking to ${agedPosition}s, paused=$isPaused" }
+            }
+
+            applyActions(actions, setBy)
+
             protocol.globalPaused = isPaused
             protocol.globalPositionMs = agedPosition * 1000.0
             protocol.lastGlobalPositionSetAt = now
@@ -262,6 +285,7 @@ class SyncplayMessageHandler(
         // and auto-switch episodes. Only process files from OTHER users —
         // our own file echoes are not relayed by the server.
         if (userData.file != null && userName != session.currentUsername) {
+            logger.debug { "Inbound file from '$userName': ${userData.file.name}" }
             session.emitInboundFile(userData.file)
         }
 
@@ -272,6 +296,7 @@ class SyncplayMessageHandler(
                     if (idx >= 0) {
                         updated.removeAt(idx)
                         changed = true
+                        logger.info { "User '$userName' left room" }
                         callback.onSomeoneLeft(userName)
                     }
                 }
@@ -289,6 +314,7 @@ class SyncplayMessageHandler(
                         )
                         changed = true
                     }
+                    logger.info { "User '$userName' joined room" }
                     callback.onSomeoneJoined(userName)
                 }
             }
@@ -326,6 +352,8 @@ class SyncplayMessageHandler(
     private suspend fun handleReadySet(ready: me.him188.ani.syncplay.protocol.wire.ReadyData) {
         val userName = ready.username ?: return
         val isReady = ready.isReady ?: return
+
+        logger.debug { "User '$userName' readiness=$isReady" }
 
         val current = session.userList.value
         val idx = current.indexOfFirst { it.name == userName }
